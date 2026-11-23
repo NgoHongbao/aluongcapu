@@ -5,6 +5,7 @@ MongoDB or local SQLite, with private uploads.
 from __future__ import annotations
 
 import hashlib
+import logging
 import io
 import json
 import mimetypes
@@ -21,10 +22,12 @@ import google_login
 from private_media import PrivateMedia
 from urllib.parse import quote
 try:
-    from pymongo.errors import PyMongoError
+    from pymongo.errors import ConfigurationError, PyMongoError, ServerSelectionTimeoutError
 except ImportError:
     class PyMongoError(Exception):
         pass
+
+    ConfigurationError = ServerSelectionTimeoutError = PyMongoError
 import time
 import uuid
 import zipfile
@@ -51,6 +54,7 @@ MAX_UPLOAD = int(os.environ.get('MAX_UPLOAD_BYTES', 12 * 1024 * 1024))
 COOKIE_SECURE = os.environ.get('COOKIE_SECURE', 'false').lower() == 'true'
 OWNER_SETUP_CODE = os.environ.get('OWNER_SETUP_CODE', '').strip()
 login_attempts: dict[str, list[int]] = {}
+last_mongo_warning: dict[str, float] = {}
 ORIGINS = {s.strip().rstrip('/') for s in os.environ.get('ALLOWED_ORIGINS', '').split(',') if s.strip()}
 ph = PasswordHasher(time_cost=2, memory_cost=65536, parallelism=2)
 mutex = threading.RLock()
@@ -277,8 +281,31 @@ async def security_headers(request: Request, call_next):
     return response
 
 
+def mongo_failure_reason(error):
+    # Inspect driver details locally, but never send their text to deploy logs.
+    details = str(error).lower()
+    if getattr(error, 'code', None) == 18 or 'authentication failed' in details or 'bad auth' in details:
+        return 'authentication failed: check the Atlas database username and password'
+    if getattr(error, 'code', None) == 13:
+        return 'permission denied: check the Atlas database user roles'
+    if any(term in details for term in ('certificate verify', 'ssl', 'tls')):
+        return 'TLS failed: check the Atlas endpoint and network access'
+    if any(term in details for term in ('dns', 'nxdomain', '_mongodb._tcp', 'name or service not known')):
+        return 'DNS lookup failed: check the cluster hostname'
+    if isinstance(error, ServerSelectionTimeoutError):
+        return 'connection timed out: check Atlas cluster status and the Render outbound IP allowlist'
+    if isinstance(error, ConfigurationError):
+        return 'connection configuration invalid: check MONGODB_URI format'
+    return 'database request failed: check Atlas connection settings'
+
+
 @app.exception_handler(PyMongoError)
 async def database_unavailable(request, error):
+    reason = mongo_failure_reason(error)
+    now = time.monotonic()
+    if now - last_mongo_warning.get(reason, float('-inf')) >= 30:
+        last_mongo_warning[reason] = now
+        logging.getLogger('uvicorn.error').warning('MongoDB: %s', reason)
     return JSONResponse({'detail': 'Không kết nối được MongoDB. Vui lòng thử lại.'}, status_code=503)
 
 
