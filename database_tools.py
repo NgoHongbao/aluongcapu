@@ -12,6 +12,7 @@ from contextlib import closing
 from pathlib import Path
 
 from storage import Records
+from private_media import PrivateMedia
 
 TABLES = dict(users='id', sessions='token_hash', invitations='token_hash', settings='key',
               albums='id', media='id', memories='id', notes='id', letters='id', goals='id',
@@ -94,21 +95,24 @@ def migrate(store, sqlite_path, media_path, destination, *, dry_run=False):
     return {**{table: len(rows) for table, rows in records.items()}, 'files': len(names)}
 
 
-def backup(store, media_path, output):
+def backup(store, media_path, output, *, gridfs=False):
+    media = PrivateMedia(media_path, store.mongo if gridfs else None)
     records = {table: store.find(table) for table in TABLES if table not in ('sessions', 'invitations')}
     with output.open('xb') as stream:
         try:
             with zipfile.ZipFile(stream, 'w', zipfile.ZIP_DEFLATED) as archive:
                 archive.writestr('database.json', json.dumps({'version': 1, 'records': records}, ensure_ascii=False))
                 for name in file_names(records):
-                    archive.write(media_path / name, f'private_uploads/{name}')
+                    with media.open(name) as source, archive.open(f'private_uploads/{name}', 'w') as out:
+                        shutil.copyfileobj(source, out)
         except Exception:
             stream.close()
             output.unlink(missing_ok=True)
             raise
 
 
-def restore(store, source, destination):
+def restore(store, source, destination, *, gridfs=False):
+    media = PrivateMedia(destination, store.mongo if gridfs else None)
     if any(store.count(table) for table in TABLES):
         raise ValueError('Restore requires an empty MongoDB database.')
     with zipfile.ZipFile(source) as archive:
@@ -124,10 +128,25 @@ def restore(store, source, destination):
             raise ValueError('Damaged backup.')
         for name in names:
             with archive.open(f'private_uploads/{name}') as stream:
-                copy_file(stream, destination / name, dry_run=True)
+                if gridfs:
+                    try:
+                        with media.open(name) as existing:
+                            if digest(stream) != digest(existing):
+                                raise ValueError(f'Destination file conflict: {name}')
+                    except FileNotFoundError:
+                        continue
+                else:
+                    copy_file(stream, destination / name, dry_run=True)
         for name in names:
             with archive.open(f'private_uploads/{name}') as stream:
-                copy_file(stream, destination / name)
+                if gridfs:
+                    try:
+                        with media.open(name):
+                            continue
+                    except FileNotFoundError:
+                        media.write(name, stream)
+                else:
+                    copy_file(stream, destination / name)
         import_records(store, records)
 
 
@@ -147,16 +166,19 @@ def main():
         parser.error('MONGODB_URI must be configured.')
     store = Records(None, uri, os.getenv('MONGODB_DB', 'our_little_universe'))
     destination = Path(os.getenv('DATA_DIR', 'data')) / 'private_uploads'
+    gridfs = os.getenv('MEDIA_STORAGE', 'disk') == 'gridfs'
     try:
+        if gridfs and args.command == 'migrate' and not dry_run:
+            raise ValueError('Import SQLite into disk-backed storage, then backup and restore to GridFS.')
         if not dry_run:
             store.indexes()
         if args.command == 'migrate':
             source = args.source_media or args.sqlite.parent / 'private_uploads'
             print(json.dumps(migrate(store, args.sqlite, source, destination, dry_run=dry_run), indent=2))
         elif args.command == 'backup':
-            backup(store, destination, args.archive)
+            backup(store, destination, args.archive, gridfs=gridfs)
         else:
-            restore(store, args.archive, destination)
+            restore(store, args.archive, destination, gridfs=gridfs)
     except Exception as error:
         print(f'{type(error).__name__}: {error}', file=sys.stderr)
         return 1

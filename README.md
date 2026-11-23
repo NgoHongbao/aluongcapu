@@ -115,3 +115,11 @@ Nếu muốn giữ tài khoản, kỷ niệm và ảnh/nhạc đang có, dùng `
 Trong Google Cloud, tạo OAuth client loại **Web application**. Thêm redirect URI chính xác, ví dụ `https://love.example.com/api/auth/google/callback`. Nếu ứng dụng Google đang ở chế độ thử nghiệm, thêm hai tài khoản Google vào danh sách test users. Đặt Client ID và Client Secret vào cấu hình máy chủ, rồi chạy lại Compose. [Hướng dẫn Google OpenID Connect](https://developers.google.com/identity/openid-connect/openid-connect)
 
 Pu đăng nhập bằng tài khoản web hiện có một lần, vào **Cài đặt → Hai người → Liên kết tài khoản Google** và chọn tài khoản Google của Pu. Sau đó có thể dùng **Đăng nhập bằng Google**. Chỉ tài khoản Google đã liên kết mới đăng nhập được. Nếu Messenger mở bằng trình duyệt trong ứng dụng và Google từ chối, chọn mở đường dẫn bằng Chrome hoặc Safari.
+
+### Triển khai miễn phí trên Render và MongoDB Atlas
+
+Tạo cụm Atlas Free, database user có quyền đọc/ghi database `our_little_universe`, và thêm dải IP outbound của dịch vụ Render vào IP access list của Atlas. Sau đó mở [Render Blueprint](https://dashboard.render.com/blueprints/new) và chọn kho GitHub này. Blueprint dùng gói Free và biến `MEDIA_STORAGE=gridfs`, vì hệ thống tệp của Render Free không bền vững. Nhập URI Atlas vào biến bí mật `MONGODB_URI` trên Render.
+
+Để chuyển dữ liệu cũ, tạo bản sao lưu như hướng dẫn trên. Trên máy cục bộ, dùng URI Atlas, cùng tên database và `MEDIA_STORAGE=gridfs`, rồi chạy `database_tools.py restore` với bản sao lưu nằm trên máy. Cho phép IP của máy cục bộ trong Atlas trong lúc khôi phục. Bản sao lưu không cần đi qua GitHub. Đừng đăng ký lại tài khoản trên dịch vụ mới trước khi khôi phục xong.
+
+Render Free có thể ngủ khi không có truy cập và mất thời gian khởi động lại. Cả dữ liệu và ảnh/nhạc phải nằm trong dung lượng của gói Atlas Free. Sau khi Render cấp URL, cấu hình Google theo hướng dẫn ở trên bằng chính URL đó. [Render Free](https://render.com/docs/free) · [MongoDB Atlas](https://www.mongodb.com/docs/atlas/connect-to-database-deployment/)

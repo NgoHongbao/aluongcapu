@@ -18,6 +18,7 @@ def app(tmp_path, monkeypatch):
     module_name = 'couple_test_' + uuid.uuid4().hex
     monkeypatch.setenv('MONGODB_URI', os.getenv('TEST_MONGODB_URI', ''))
     monkeypatch.setenv('MONGODB_DB', module_name)
+    monkeypatch.setenv('MEDIA_STORAGE', os.getenv('TEST_MEDIA_STORAGE', 'disk'))
     spec = importlib.util.spec_from_file_location(module_name, Path(__file__).parents[1] / 'server.py')
     module = importlib.util.module_from_spec(spec)
     sys.modules[module_name] = module
@@ -96,6 +97,8 @@ def test_profile_media_calendar_and_pins(couple, app):
     assert partner.get('/api/data').json()['settings']['avatar_owner_media_id'] == profile
     assert TestClient(app).get('/api/media/' + chat_photo).status_code == 401
     assert partner.get('/api/media/' + chat_photo).status_code == 200
+    partial=partner.get('/api/media/'+chat_photo, headers={'Range':'bytes=0-7'})
+    assert partial.status_code == 206 and partial.content == bytes.fromhex('89504e470d0a1a0a')
     assert partner.patch('/api/settings', headers=ph, json={'avatar_owner_media_id':chat_photo}).status_code == 403
     assert image('profile') != profile
     assert owner.get('/api/data').json()['settings']['avatar_owner_media_id'] != profile

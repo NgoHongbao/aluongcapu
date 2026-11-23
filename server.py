@@ -18,6 +18,8 @@ from contextlib import closing
 from storage import Records
 from couple import register as register_couple
 import google_login
+from private_media import PrivateMedia
+from urllib.parse import quote
 try:
     from pymongo.errors import PyMongoError
 except ImportError:
@@ -146,6 +148,10 @@ DEFAULT_SETTINGS = {
 
 
 store = Records(DB, os.getenv('MONGODB_URI', ''), os.getenv('MONGODB_DB', 'our_little_universe'))
+use_gridfs = os.getenv('MEDIA_STORAGE', 'disk') == 'gridfs'
+if use_gridfs and store.mongo is None:
+    raise RuntimeError('MEDIA_STORAGE=gridfs requires MONGODB_URI.')
+private_media = PrivateMedia(MEDIA_DIR, store.mongo if use_gridfs else None)
 EXTRA_COLUMNS = {
     'users': {'nickname': "TEXT NOT NULL DEFAULT ''", 'auto_avatar': 'INTEGER NOT NULL DEFAULT 0'},
     'gifts': {'music_youtube': "TEXT NOT NULL DEFAULT ''"},
@@ -707,19 +713,19 @@ def upload(request: Request, file: UploadFile = File(...), purpose: str = 'galle
     file_id = uuid.uuid4().hex
     filename = f'{file_id}{ACCEPTED[mime]}'
     thumb_name = f'{file_id}_thumb.webp' if thumb else None
-    (MEDIA_DIR/filename).write_bytes(contents)
-    if thumb_name:
-        (MEDIA_DIR/thumb_name).write_bytes(thumb)
     original_name = Path(file.filename or 'file').name[:180]
     row = dict(id=file_id, album_id=None, caption='', original_name=original_name, mime=mime,
                size=len(contents), filename=filename, thumbnail=thumb_name, created_by=user['id'],
                created_at=utcnow(), purpose=purpose)
     try:
+        private_media.write(filename, contents)
+        if thumb_name:
+            private_media.write(thumb_name, thumb)
         store.insert('media', row)
     except Exception:
-        (MEDIA_DIR / filename).unlink(missing_ok=True)
+        private_media.delete(filename)
         if thumb_name:
-            (MEDIA_DIR / thumb_name).unlink(missing_ok=True)
+            private_media.delete(thumb_name)
         raise
     if purpose == 'profile':
         key = f"avatar_{user['role']}_media_id"
@@ -751,13 +757,37 @@ def get_media(media_id: str, request: Request, thumb: bool = False, download: bo
     if not row or not media_visible(row, user):
         raise HTTPException(404, 'File không tồn tại.')
     filename = row['thumbnail'] if thumb and row['thumbnail'] else row['filename']
+    mime = 'image/webp' if thumb and row['thumbnail'] else row['mime']
+    if use_gridfs:
+        return gridfs_response(filename, mime, row['original_name'] if download else '', request.headers.get('range'))
     fpath = MEDIA_DIR / filename
     if not fpath.is_file():
         raise HTTPException(404, 'Tệp đã bị thiếu.')
-    mime = 'image/webp' if thumb and row['thumbnail'] else row['mime']
     return FileResponse(fpath, media_type=mime,
                         filename=row['original_name'] if download else None,
                         content_disposition_type='attachment' if download else 'inline')
+
+
+def gridfs_response(filename, mime, original_name, requested_range):
+    headers = {'Accept-Ranges': 'bytes'}
+    if original_name:
+        headers['Content-Disposition'] = "attachment; filename*=UTF-8''" + quote(original_name, safe='')
+    try:
+        with private_media.open(filename) as stream:
+            size = stream.length
+            if not requested_range:
+                return Response(stream.read(), media_type=mime, headers=headers)
+            match = re.fullmatch(r'bytes=(\d{0,20})-(\d{0,20})', requested_range)
+            first, last = match.groups() if match else ('', '')
+            start = int(first) if first else max(0, size - int(last or 0))
+            end = min(size - 1, int(last)) if first and last else size - 1
+            if start > end or not (first or last):
+                return Response(status_code=416, headers={**headers, 'Content-Range': f'bytes */{size}'})
+            stream.seek(start)
+            headers['Content-Range'] = f'bytes {start}-{end}/{size}'
+            return Response(stream.read(end - start + 1), status_code=206, media_type=mime, headers=headers)
+    except FileNotFoundError:
+        raise HTTPException(404, 'Tệp đã bị thiếu.') from None
 
 
 @app.delete('/api/media/{media_id}')
@@ -785,7 +815,7 @@ def remove_media(media_id: str, request: Request):
         store.delete('media', id=media_id)
     for key in ('filename','thumbnail'):
         if row[key]:
-            (MEDIA_DIR / row[key]).unlink(missing_ok=True)
+            private_media.delete(row[key])
     return {'ok': True}
 
 
@@ -805,9 +835,11 @@ def export_all(request: Request):
                 payload[table] = store.find(table)
         archive.writestr('ky-niem.json', json.dumps(payload, ensure_ascii=False, indent=2))
         for r in payload['media']:
-            f = MEDIA_DIR / r['filename']
-            if f.is_file():
-                archive.write(f, f"uploads/{r['id']}_{Path(r['original_name']).name}")
+            try:
+                with private_media.open(r['filename']) as stream:
+                    archive.writestr(f"uploads/{r['id']}_{Path(r['original_name']).name}", stream.read())
+            except FileNotFoundError:
+                continue
     buffer.seek(0)
     return StreamingResponse(buffer, media_type='application/zip',
                              headers={'Content-Disposition':'attachment; filename="A-Luong-CaPu-Backup.zip"'})

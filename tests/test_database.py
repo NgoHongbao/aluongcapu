@@ -31,6 +31,7 @@ def test_sqlite_migration_and_restore(tmp_path):
         return
     staged = Records(None, uri, 'universe_migration_' + uuid.uuid4().hex)
     recovered = Records(None, uri, 'universe_restore_' + uuid.uuid4().hex)
+    hosted = Records(None, uri, 'universe_gridfs_' + uuid.uuid4().hex)
     try:
         staged.indexes()
         for _ in range(2):
@@ -45,9 +46,15 @@ def test_sqlite_migration_and_restore(tmp_path):
         assert recovered.one('albums', id='album-id')['title'] == 'Album cũ'
         assert (restored / name).read_bytes() == b'original'
         assert (restored / thumb).read_bytes() == b'thumbnail'
+        restore(hosted, archive, restored, gridfs=True)
+        hosted_archive = tmp_path / 'hosted.zip'
+        backup(hosted, restored, hosted_archive, gridfs=True)
+        from zipfile import ZipFile
+        with ZipFile(hosted_archive) as exported:
+            assert exported.read('private_uploads/'+name) == b'original'
         with pytest.raises(ValueError, match='empty'):
             restore(recovered, archive, restored)
     finally:
-        for store in (staged, recovered):
+        for store in (staged, recovered, hosted):
             store.mongo.client.drop_database(store.mongo.name)
             store.mongo.client.close()

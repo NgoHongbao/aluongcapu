@@ -18,6 +18,7 @@ services:
       - "${LAN_BIND:-127.0.0.1}:8000:8000"
     environment:
       MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
+      MEDIA_STORAGE: ${MEDIA_STORAGE:-disk}
       MONGODB_DB: ${MONGODB_DB:-our_little_universe}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       OWNER_SETUP_CODE: ${OWNER_SETUP_CODE:-}
