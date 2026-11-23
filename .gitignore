@@ -1,0 +1,11 @@
+data/*
+!data/.gitkeep
+.env
+*.sqlite3
+*.db
+__pycache__/
+.pytest_cache/
+*.pyc
+.venv/
+.mongo-runtime/
+.mongo-runtime.zip

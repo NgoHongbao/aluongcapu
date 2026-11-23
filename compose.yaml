@@ -1,0 +1,33 @@
+services:
+  mongo:
+    image: mongo:8.0
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+    restart: unless-stopped
+  web:
+    build: .
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "${LAN_BIND:-127.0.0.1}:8000:8000"
+    environment:
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017}
+      MONGODB_DB: ${MONGODB_DB:-our_little_universe}
+      COOKIE_SECURE: ${COOKIE_SECURE:-false}
+      OWNER_SETUP_CODE: ${OWNER_SETUP_CODE:-}
+      PUBLIC_ORIGIN: ${PUBLIC_ORIGIN:-}
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-}
+    volumes:
+      - private_data:/app/data
+    restart: unless-stopped
+volumes:
+  mongo_data:
+  private_data:

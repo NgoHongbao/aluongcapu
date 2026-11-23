@@ -1,0 +1,162 @@
+"""Exercise desktop and mobile layouts with separate browser sessions on a fresh test server."""
+import argparse
+from datetime import datetime, timezone
+from io import BytesIO
+from urllib.parse import quote
+
+from PIL import Image
+from playwright.sync_api import expect, sync_playwright
+
+
+def image_bytes():
+    data = BytesIO()
+    Image.new('RGB', (80, 60), '#bd7296').save(data, 'PNG')
+    return data.getvalue()
+
+
+def run(url, executable):
+    errors = []
+    with sync_playwright() as playwright:
+        browser = playwright.chromium.launch(executable_path=executable)
+        desktop = browser.new_context(viewport={'width': 1440,'height': 900}, reduced_motion='reduce')
+        mobile = browser.new_context(**playwright.devices['Pixel 7'], reduced_motion='reduce')
+        owner, partner = desktop.new_page(), mobile.new_page()
+        for page in (owner, partner):
+            page.clock.set_fixed_time(datetime(2026, 11, 24, 12, tzinfo=timezone.utc))
+            page.on('pageerror', lambda error: errors.append(str(error)))
+        owner.goto(url)
+        expect(owner.locator('#auth-submit')).to_be_visible()
+        owner.locator('[name=email]').fill('desktop@example.test')
+        owner.locator('[name=password]').fill('SamplePassphrase123')
+        owner.locator('#auth-submit').click()
+        expect(owner.locator('#app')).to_be_visible()
+        credentials = owner.request.get(url + '/api/data').json()
+        invitation = owner.request.post(url+'/api/invite', headers={'X-CSRF-Token':credentials['csrf']})
+        partner.goto(url+'/?invite='+quote(invitation.json()['token']) if invitation.ok else url)
+        partner.locator('[name=email]').fill('mobile@example.test')
+        partner.locator('[name=password]').fill('SamplePassphrase123')
+        partner.locator('#auth-submit').click()
+        expect(partner.locator('#app')).to_be_visible()
+        expect(partner.locator('.couple-mobile')).to_be_visible()
+        owner.locator('.nav-links a[href="#chat"]').click()
+        partner.locator('.couple-mobile a[href="#chat"]').click()
+        for page in (owner, partner):
+            expect(page.locator('#chat-status')).to_have_text('Đã kết nối')
+        owner.locator('#chat-text').fill('Từ máy tính ♡')
+        owner.locator('#chat-form [name=url]').fill('https://example.com/love')
+        owner.locator('#chat-form [name=photo]').set_input_files(
+            {'name':'note.png','mimeType':'image/png','buffer':image_bytes()})
+        owner.locator('#chat-form button[type=submit]').click()
+        expect(partner.locator('#chat-messages')).to_contain_text('Từ máy tính ♡')
+        expect(partner.locator('#chat-messages a', has_text='example.com')).to_be_visible()
+        expect(partner.locator('#chat-messages img')).to_be_visible()
+        partner.locator('#chat-messages button', has_text='Trả lời').click()
+        partner.locator('#chat-text').fill('Từ điện thoại 🥰')
+        partner.locator('#chat-form button[type=submit]').click()
+        expect(owner.locator('#chat-messages')).to_contain_text('Từ điện thoại 🥰')
+        expect(owner.locator('#chat-messages')).to_contain_text('Đã đọc')
+        avatar = partner.locator('#chat-messages button', has_text='Dùng làm avatar')
+        avatar.click()
+        expect(partner.locator('#avatar-crop button')).to_be_enabled()
+        partner.locator('#avatar-crop button').click()
+        expect(partner.locator('#avatar-partner img')).to_have_count(1)
+
+        partner.locator('.couple-mobile button[data-action=settings]').click()
+        partner.locator('[data-settingstab=people]').click()
+        partner.locator('#profile-form [name=display_name]').fill('CaPu Mẫu')
+        partner.locator('#profile-form [name=nickname]').fill('Mèo')
+        partner.locator('#profile-form button[type=submit]').click()
+        expect(partner.locator('#us')).to_contain_text('CaPu Mẫu')
+        owner.locator('#us [data-action=love-date]').click()
+        owner.locator('#love-date-form [name=start_date]').fill('2026-11-01')
+        owner.locator('#love-date-form button[type=submit]').click()
+        expect(owner.locator('#us-day-count')).to_have_text('23')
+        expect(owner.locator('#us-since')).to_have_text('Từ 01/11/2026')
+        owner.locator('.nav-avatar').click()
+        owner.locator('#settings-form [name=hero_title]').fill('Ngôi nhà thử nghiệm')
+        owner.locator('#settings-form button[type=submit]').click()
+        expect(owner.locator('#modal-backdrop')).to_be_hidden()
+        expect(owner.locator('#day-counter strong').first).to_have_text('23')
+        expect(owner.locator('#custom-hero-title')).to_have_text('Ngôi nhà thử nghiệm')
+        owner.locator('#calendar [data-add=events]').click()
+        event = owner.locator('#item-form')
+        event.locator('[name=title]').fill('Hẹn cà phê')
+        event.locator('[name=event_date]').fill('2026-11-03T19:00')
+        event.locator('[name=repeat_rule]').select_option('weekly')
+        event.locator('[name=location]').fill('Quán nhỏ')
+        event.locator('[name=checklist]').fill('Đặt bàn')
+        event.locator('button[type=submit]').click()
+        expect(owner.locator('#modal-backdrop')).to_be_hidden()
+        owner.locator('[data-couple=calendar-month]').click()
+        expect(owner.locator('#event-list')).to_have_class('events-grid month-view')
+        assert owner.locator('#event-list article', has_text='Hẹn cà phê').count() == 4
+        first_task = owner.locator('[data-checklist]').first
+        first_task.check()
+        partner.reload()
+        expect(partner.locator('#event-list')).to_contain_text('Hẹn cà phê')
+        expect(partner.locator('[data-checklist]').first).to_be_checked()
+        expect(partner.locator('#day-counter strong').first).to_have_text('23')
+        expect(partner.locator('#chat-messages')).to_contain_text('Từ điện thoại 🥰')
+        expect(partner.locator('#avatar-partner img')).to_have_count(1)
+        expect(partner.locator('#us-day-count')).to_have_text('23')
+        expect(partner.locator('[data-own-avatar=owner]')).to_be_hidden()
+        partner.locator('[data-own-avatar=partner]').click()
+        partner.locator('#avatar-crop input[type=file]').set_input_files(
+            {'name':'new-avatar.png','mimeType':'image/png','buffer':image_bytes()})
+        expect(partner.locator('#avatar-crop button')).to_be_enabled()
+        partner.locator('#avatar-crop button').click()
+        expect(partner.locator('#modal-backdrop')).to_be_hidden()
+        owner.locator('#us [data-add=memories]').click()
+        owner.locator('#item-form [name=title]').fill('Một kỷ niệm đẹp')
+        owner.locator('#item-form [name=new_photo]').set_input_files(
+            {'name':'memory.png','mimeType':'image/png','buffer':image_bytes()})
+        owner.locator('#item-form button[type=submit]').click()
+        expect(owner.locator('#modal-backdrop')).to_be_hidden()
+        partner.reload()
+        memory = partner.locator('#timeline article', has_text='Một kỷ niệm đẹp')
+        expect(memory.locator('img')).to_have_count(1)
+        for index, key in enumerate(('cover_media_id','hero_left_media_id','hero_right_media_id')):
+            owner.locator(f'.frame-edit[data-frame={key}] span').click()
+            frame_form = owner.locator('#hero-photo-form')
+            if index == 0:
+                frame_form.locator('[name=photo]').set_input_files(
+                    {'name':'cover.png','mimeType':'image/png','buffer':image_bytes()})
+            else:
+                first_photo = frame_form.locator('option').nth(1).get_attribute('value')
+                frame_form.locator('select').select_option(first_photo)
+            frame_form.locator('button[type=submit]').click()
+            expect(owner.locator('#modal-backdrop')).to_be_hidden()
+        for key in ('story_cover_media_id','map_cover_media_id','room_left_media_id','room_right_media_id'):
+            owner.locator(f'[data-action=hero-photo][data-frame={key}]').click()
+            scene_form = owner.locator('#hero-photo-form')
+            photo_id = scene_form.locator('option').nth(1).get_attribute('value')
+            scene_form.locator('select').select_option(photo_id)
+            scene_form.locator('button[type=submit]').click()
+            expect(owner.locator('#modal-backdrop')).to_be_hidden()
+        partner.reload()
+        expect(partner.locator('.hero-art .art-photo.covered')).to_have_count(3)
+        expect(partner.locator('.story-illustration.covered, .map-cover-photo.covered, .room-picture .picture-inner.covered')).to_have_count(4)
+        partner.locator('.room-picture.picture-1').click()
+        expect(partner.locator('#gallery')).to_be_in_viewport()
+        owner.locator('#letters .letter-stage-copy [data-action=new-letter]').click()
+        letter = owner.locator('#item-form')
+        letter.locator('[name=title]').fill('Thư có ảnh')
+        letter.locator('[name=body]').fill('Một lá thư kèm ảnh')
+        letter.locator('[name=new_photo]').set_input_files(
+            {'name':'private-letter.png','mimeType':'image/png','buffer':image_bytes()})
+        letter.locator('button[type=submit]').click()
+        expect(owner.locator('#modal-backdrop')).to_be_hidden()
+        partner.reload()
+        partner.get_by_role('button', name='Thư có ảnh', exact=False).click()
+        expect(partner.locator('#modal-body img[alt="Ảnh đính kèm"]')).to_be_visible()
+        assert not errors, errors
+        browser.close()
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument('url')
+    parser.add_argument('--chromium')
+    args = parser.parse_args()
+    run(args.url, args.chromium)
+    print('Desktop/mobile smoke passed.')

@@ -1,0 +1,185 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+  <meta name="theme-color" content="#fcf7f5" />
+  <meta name="description" content="A Lương ♡ CaPu — Our Little Universe. Ngôi nhà kỷ niệm của hai người." />
+  <title>A Lương ♡ CaPu | Our Little Universe</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
+  <link rel="stylesheet" href="/assets/style.css" />
+  <link rel="stylesheet" href="/assets/couple.css?v=music-volume" />
+  <script defer src="/assets/couple.js"></script>
+  <script defer src="/assets/app.js?v=google-login"></script>
+</head>
+<body>
+  <div id="star-cursor" aria-hidden="true"></div>
+  <div class="ambient ambient-a" aria-hidden="true"></div>
+  <div class="ambient ambient-b" aria-hidden="true"></div>
+  <div class="petals" id="petals" aria-hidden="true"></div>
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <div id="auth-screen" class="auth-screen hidden">
+    <div class="auth-decor" aria-hidden="true"><span>✧</span><span>♡</span><span>✦</span></div>
+    <div class="auth-card glass">
+      <div class="auth-mark">♡</div>
+      <p class="eyebrow">A PRIVATE LITTLE UNIVERSE</p>
+      <h1>A Lương <i>♡</i> CaPu</h1>
+      <p class="auth-sub" id="auth-intro">Nơi những khoảnh khắc nhỏ trở thành kỷ niệm mãi mãi.</p>
+      <form id="auth-form" class="form-stack">
+        <label>Email của bạn<input name="email" type="email" required placeholder="ten@email.com" autocomplete="email" /></label>
+        <label>Mật khẩu<input name="password" type="password" required minlength="10" placeholder="Tối thiểu 10 ký tự" autocomplete="current-password" /></label>
+        <label id="setup-code-label" class="hidden">Mã thiết lập chủ sở hữu<input type="hidden" name="invite" id="invite-input" placeholder="Nhập OWNER_SETUP_CODE" /></label>
+        <button type="submit" class="btn btn-primary btn-full" id="auth-submit">Đăng nhập <span>↗</span></button>
+      </form>
+      <a class="btn btn-outline" id="google-login" href="/api/auth/google" hidden>Đăng nhập bằng Google</a><p class="auth-foot" id="auth-foot">Chỉ A Lương và CaPu mới có thể bước vào đây. ♡</p>
+      <div id="auth-error" role="alert" class="auth-error hidden"></div>
+    </div>
+    <p class="auth-bottom">MADE WITH LOVE · FOREVER, OURS</p>
+  </div>
+
+  <div id="app" class="hidden">
+    <header class="navbar" id="navbar">
+      <a class="brand" href="#home" aria-label="Về trang chủ">
+        <span class="brand-symbol">♡</span>
+        <span class="brand-copy"><b>A Lương & CaPu</b><small>our little universe</small></span>
+      </a>
+      <nav class="nav-links" aria-label="Điều hướng"><a href="#chat" class="server-only">Tin nhắn<span class="chat-count"></span></a>
+        <a href="#story">Chuyện chúng mình</a>
+        <a href="#gallery">Album</a>
+        <a href="#letters">Thư tình</a>
+        <a href="#secret">Góc bí mật</a>
+      </nav>
+      <div class="nav-right">
+        <button class="icon-btn theme-switch" data-action="theme" title="Đổi chế độ sáng tối" aria-label="Đổi chủ đề">☾</button>
+        <button class="nav-avatar" data-action="settings" title="Thiết lập website">AL</button>
+        <button class="mobile-menu icon-btn" data-action="menu" aria-label="Mở menu">☰</button>
+      </div>
+    </header>
+    <div id="mobile-nav" class="mobile-nav hidden"><a href="#story">Chuyện chúng mình</a><a href="#gallery">Album ảnh</a><a href="#letters">Thư tình</a><a href="#jar">Hũ kỷ niệm</a><a href="#secret">Góc bí mật</a><a href="#calendar">Lịch</a></div>
+    <main>
+      <section class="hero" id="home">
+        <div class="hero-left">
+          <span class="tiny-star star-one">✧</span><span class="tiny-star star-two">✦</span><span class="tiny-star star-three">✧</span>
+          <div class="hero-topline"><span class="dot-glow"></span> WELCOME TO OUR LITTLE UNIVERSE <span class="line"></span></div>
+          <p class="hero-intro">Một câu chuyện, hai trái tim, vô vàn kỷ niệm.</p>
+          <h1 class="hero-title" id="custom-hero-title" hidden></h1><h1 class="hero-title" id="couple-default-title"><span class="name-aluong">A Lương</span><span class="hero-and">&nbsp;<i>♡</i>&nbsp;</span><span class="name-capu">CaPu</span></h1>
+          <div class="hero-underline"><svg width="270" height="23" viewBox="0 0 270 23" fill="none" aria-hidden="true"><path d="M1 18C56 3 110 2 148 9c40 7 84 2 120-7" stroke="currentColor" stroke-width="2" stroke-linecap="round"/><path d="M140 9l5-6 4 7" stroke="currentColor" stroke-width="1.5"/></svg></div>
+          <p class="hero-caption" id="hero-caption">Giữa hàng tỷ người, anh chỉ muốn cùng em viết nên câu chuyện của chúng mình.</p>
+          <div class="hero-buttons"><a class="btn btn-primary" href="#story">Khám phá chuyện chúng mình <span>↗</span></a><button class="btn btn-outline" data-action="open-gift">Một điều dành cho em <span>♡</span></button></div>
+          <div class="hero-stats" id="hero-stats"><div class="hero-stat"><strong>∞</strong><span>Khoảnh khắc muốn giữ</span></div><div class="stat-divider"></div><div class="hero-stat"><strong>02</strong><span>Trái tim chung nhịp</span></div><div class="stat-divider"></div><div class="hero-stat"><strong>01</strong><span>Thế giới của chúng mình</span></div></div>
+          <div class="hero-scroll"><span class="mouse-outline"><span></span></span><span>CUỘN ĐỂ KHÁM PHÁ</span></div>
+        </div>
+        <div class="hero-right">
+          <div class="hero-art">
+            <div class="art-halo"></div>
+            <div class="art-orbit orbit-one"></div><div class="art-orbit orbit-two"></div>
+            <div class="art-hanging-star top-star">✦</div>
+            <div class="art-frame main-frame"><div class="art-photo art-photo-main"><div class="moon"></div><div class="landscape-cloud cloud-one"></div><div class="landscape-cloud cloud-two"></div><div class="mountain mountain-back"></div><div class="mountain mountain-front"></div><div class="landscape-water"></div><div class="art-stars">✦ &nbsp; · &nbsp; ✧</div></div><span class="photo-label">forever starts here ♡</span><button type="button" class="frame-edit" data-action="hero-photo" data-frame="cover_media_id" aria-label="Đổi ảnh khung giữa"><span>Đổi ảnh</span></button></div>
+            <div class="art-frame floating-frame frame-small"><div class="art-photo art-photo-flower"><div class="flower-drawing">✿</div></div><span class="photo-label">just us two</span><button type="button" class="frame-edit" data-action="hero-photo" data-frame="hero_left_media_id" aria-label="Đổi ảnh khung bên trái"><span>Đổi ảnh</span></button></div>
+            <div class="art-frame floating-frame frame-bottom"><div class="art-photo art-photo-peach"><span class="doodle-heart">♡</span></div><span class="photo-label">our favorite little moments</span><button type="button" class="frame-edit" data-action="hero-photo" data-frame="hero_right_media_id" aria-label="Đổi ảnh khung bên phải"><span>Đổi ảnh</span></button></div>
+            <div class="art-sticker sticker-heart">♥</div><div class="art-sticker sticker-sparkle">✧</div><div class="art-note">♡<br/><span>lucky to have you</span></div>
+          </div>
+          <div class="hero-art-caption">A SMALL SPACE · A BIG LOVE STORY · 2026 & BEYOND</div>
+        </div>
+      </section>
+
+      <section class="marquee" aria-label="Thông điệp yêu thương"><div>YOU & ME <span>✿</span> LITTLE THINGS, BIG FEELINGS <span>♡</span> ONE STORY, TWO HEARTS <span>✦</span> YOU & ME <span>✿</span> LITTLE THINGS, BIG FEELINGS <span>♡</span> ONE STORY, TWO HEARTS <span>✦</span></div></section>
+
+      <section class="section day-section" id="days">
+        <div class="day-flower left-flower" aria-hidden="true">✿</div><div class="day-flower right-flower" aria-hidden="true">❀</div>
+        <p class="eyebrow center">EVERY SECOND WITH YOU MATTERS</p>
+        <h2 class="section-title center">Ngày tháng có <em>đôi mình</em></h2>
+        <p class="section-sub center">Mỗi giây trôi qua đều là một lý do để mỉm cười.</p>
+        <div id="day-counter" class="counter-grid"><div class="counter-placeholder"><span>♡</span><p>Chưa thiết lập ngày bắt đầu câu chuyện</p><button class="text-link" data-action="settings">Thêm ngày đặc biệt ↗</button></div></div>
+        <div id="next-anniversary" class="anniversary-line"></div>
+      </section>
+
+      <section class="section us-section" id="us" aria-labelledby="us-title">
+        <div class="section-head center-head">
+          <h2 class="section-title" id="us-title">The <em>two of us</em> ♡</h2>
+        </div>
+        <div class="us-cards">
+          <div class="us-profile">
+            <div class="profile-ring profile-a"><div id="avatar-owner" class="profile-avatar">A</div></div>
+            <span class="profile-role">THE BOY</span><h3>A Lương</h3>
+            <button type="button" class="btn btn-soft profile-avatar-edit server-only" data-couple="avatar" data-own-avatar="owner" hidden>Đổi avatar</button>
+          </div>
+          <div class="us-center">
+            <div class="us-heart" aria-hidden="true">♡</div>
+            <p class="us-days" id="us-days" hidden><strong id="us-day-count"></strong><span>ngày bên nhau</span></p>
+            <p id="us-since" class="us-since" hidden></p>
+          </div>
+          <div class="us-profile">
+            <div class="profile-ring profile-b"><div id="avatar-partner" class="profile-avatar">P</div></div>
+            <span class="profile-role">THE GIRL</span><h3>Pu</h3>
+            <button type="button" class="btn btn-soft profile-avatar-edit server-only" data-couple="avatar" data-own-avatar="partner" hidden>Đổi avatar</button>
+          </div>
+        </div>
+        <div class="us-actions">
+          <button type="button" class="btn btn-soft" data-action="love-date">Đặt ngày yêu</button>
+          <button type="button" class="btn btn-primary" data-add="memories">Lưu kỷ niệm ♡</button>
+          <a class="btn btn-outline" href="#story">Xem kỷ niệm</a>
+        </div>
+      </section>
+
+      <section class="section story-section" id="story">
+        <div class="section-head split-head"><div><p class="eyebrow">CHAPTER 01 — OUR STORY</p><h2 class="section-title">Chuyện của <em>chúng mình</em><span class="heading-heart"> ♡</span></h2><p class="section-sub">Những khoảnh khắc bé xíu, nhưng lại là cả một bầu trời thương nhớ.</p></div><button class="btn btn-soft" data-add="memories">+ Thêm một kỷ niệm</button></div>
+        <div class="story-layout"><div class="story-intro-card"><span class="story-seal">✦ CHAPTER ONE ✦</span><div class="story-illustration"><div class="story-disc"></div><div class="story-sun"></div><div class="story-fields"></div><span>♡</span></div><button type="button" class="btn btn-soft scene-photo-edit" data-action="hero-photo" data-frame="story_cover_media_id">Đổi ảnh câu chuyện</button><h3>Every love story is beautiful, <em>but ours is my favorite.</em></h3><p>Không cần một câu chuyện hoàn hảo. Chỉ cần có nhau trong từng chương nhỏ.</p><div class="story-sign">with love, A Lương & CaPu</div></div><div class="timeline" id="timeline"></div></div>
+      </section>
+
+      <section class="section gallery-section" id="gallery"><div class="section-head split-head"><div><p class="eyebrow">CHAPTER 02 — OUR GALLERY</p><h2 class="section-title">Thước phim <em>thương nhớ</em></h2><p class="section-sub">Một chiếc album nhỏ, chứa thật nhiều khoảnh khắc dịu dàng.</p></div><div class="head-actions"><button class="btn btn-soft" data-add="albums">+ Album mới</button><button class="btn btn-primary" data-action="upload">↑ Tải ảnh lên</button></div></div><div class="gallery-controls"><div class="gallery-tabs" id="gallery-tabs"><button class="chip active" data-filter="all">Tất cả ♡</button></div><div class="gallery-count" id="gallery-count">0 khoảnh khắc</div></div><div id="album-cover"></div><div class="gallery-grid" id="gallery-grid"></div><input type="file" id="file-input" accept="image/*,video/mp4,video/webm" multiple hidden/><div class="gallery-foot">Gom từng mảnh ký ức, để mai này vẫn có một nơi trở về. <span>✦</span></div></section>
+
+      <section class="section letters-section" id="letters"><div class="section-head center-head"><p class="eyebrow">CHAPTER 03 — LETTERS FROM THE HEART</p><h2 class="section-title">Có những điều <em>anh muốn nói</em></h2><p class="section-sub">Đôi khi, tình yêu chỉ cần một lá thư được viết bằng tất cả chân thành.</p></div><div class="letter-stage"><div class="letter-accent accent-one">✿</div><div class="letter-accent accent-two">✧</div><div class="letter-envelope" data-action="new-letter" role="button" tabindex="0" aria-label="Viết thư mới"><div class="envelope-back"></div><div class="envelope-front"></div><div class="envelope-fold"></div><div class="envelope-seal">♥</div></div><div class="letter-stage-copy"><span class="handwritten">Dear my love,</span><h3>Một lá thư dành<br/>cho người thương.</h3><p>Lưu lại những lời chưa kịp nói, hoặc hẹn một ngày thật đặc biệt để mở chúng ra.</p><button class="btn btn-primary" data-action="new-letter">Viết lá thư của chúng mình ↗</button></div></div><div class="mini-section-header"><h3>Hộp thư của hai người</h3><span>♡ every word matters</span></div><div id="letter-list" class="letter-list"></div></section>
+
+      <section class="section treasures-section" id="jar"><div class="treasure-col jar-area"><p class="eyebrow">CHAPTER 04 — THE MEMORY JAR</p><h2 class="section-title">Hũ <em>hạnh phúc</em> ♡</h2><p class="section-sub">Mỗi mẩu giấy là một lời yêu được cất thật kỹ.</p><div class="jar-scene"><div class="jar-spark jar-spark1">✧</div><div class="jar-spark jar-spark2">✦</div><button class="jar-glass" data-action="random-note" aria-label="Rút một mẩu giấy trong hũ"><div class="jar-lid"></div><div class="jar-neck"></div><div class="jar-body"><span class="paper paper-1"></span><span class="paper paper-2"></span><span class="paper paper-3"></span><span class="paper paper-4"></span><span class="paper paper-5"></span><span class="jar-icon">♡</span></div></button><div class="jar-shadow"></div></div><div class="jar-actions"><button class="btn btn-primary" data-action="random-note">✧ Rút một mẩu giấy</button><button class="btn btn-outline" data-add="notes">+ Viết lời nhắn</button><button class="btn btn-soft" data-action="all-notes">Xem những lời nhắn</button></div><div id="note-count" class="handwritten note-count">0 mẩu yêu thương</div></div><div class="treasure-col bucket-area" id="bucket"><p class="eyebrow">OUR LITTLE BUCKET LIST</p><h2 class="section-title">Cùng nhau <em>làm điều nhỏ xinh</em></h2><p class="section-sub">Những điều chúng mình mong một ngày sẽ thực hiện cùng nhau.</p><div class="bucket-card"><div class="bucket-progress-top"><span>ƯỚC MƠ ĐÔI MÌNH</span><span id="goal-progress-label">0/0 hoàn thành</span></div><div class="progress-track"><div id="goal-progress" class="progress-fill"></div></div><div id="goal-list" class="goal-list"></div><button class="add-line" data-add="goals">+ Thêm một điều muốn làm cùng nhau</button></div></div></section>
+
+      <section class="section map-section" id="map"><div class="section-head split-head"><div><p class="eyebrow">CHAPTER 05 — PLACES & PROMISES</p><h2 class="section-title">Đi đâu cũng được, <em>miễn là cùng nhau</em></h2><p class="section-sub">Đánh dấu những nơi đã đi qua và những chân trời muốn khám phá.</p></div><div class="head-actions"><button type="button" class="btn btn-soft" data-action="hero-photo" data-frame="map_cover_media_id">Đổi ảnh nền bản đồ</button><button class="btn btn-soft" data-add="places">+ Đánh dấu địa điểm</button></div></div><div class="map-layout"><div class="world-map" id="world-map"><div class="map-cover-photo" aria-hidden="true"></div><div class="map-header"><span>♡ OUR MEMORY MAP</span><span>✧ WANDER TOGETHER</span></div><div class="map-gridlines"></div><div class="world-land land-1"></div><div class="world-land land-2"></div><div class="world-land land-3"></div><div class="world-land land-4"></div><div class="world-land land-5"></div><div class="map-markers" id="map-markers"></div><div class="map-footer">Everywhere is beautiful with you <span>♡</span></div></div><div class="map-sidebar"><span class="eyebrow">OUR DESTINATIONS</span><div id="places-list" class="places-list"></div></div></div></section>
+
+      <section class="section room-section" id="secret"><div class="section-head center-head"><p class="eyebrow">CHAPTER 06 — THE SECRET ROOM</p><h2 class="section-title">Một góc nhỏ <em>chỉ của đôi mình</em></h2><p class="section-sub">Chạm vào từng món đồ để khám phá những kỷ niệm được cất giấu.</p></div><div class="secret-room"><div class="room-wall-stars" aria-hidden="true">✧ &nbsp; ✦ &nbsp; · &nbsp; ✧ &nbsp; ✦</div><div class="room-window"><div class="room-moon"></div><div class="window-stars">✦ ✧ · ✦</div><div class="window-cross"></div></div><button class="room-picture picture-1" data-action="scroll-gallery"><div class="picture-inner picture-sky">♡</div><span>our pictures</span></button><button class="room-picture picture-2" data-action="scroll-story"><div class="picture-inner picture-sun">✿</div><span>our story</span></button><button class="room-letter" data-action="new-letter"><span>✉</span><small>love letters</small></button><div class="room-desk"><div class="desk-top"></div><div class="desk-legs"></div></div><button class="room-gift" data-action="open-gift"><span class="gift-bow">✿</span><span class="gift-ribbon"></span><span class="gift-body"></span><small>open me ♡</small></button><div class="room-rug"></div><span class="room-floor-caption">YOUR SAFE PLACE · OUR HOME</span></div><div class="room-links"><button type="button" class="room-link" data-action="hero-photo" data-frame="room_left_media_id">Đổi ảnh khung trái</button><button type="button" class="room-link" data-action="hero-photo" data-frame="room_right_media_id">Đổi ảnh khung phải</button><button class="room-link" data-action="open-gift">🎁 Món quà bí mật</button><button class="room-link" data-add="gifts">✉ Chuẩn bị bất ngờ</button></div></section>
+
+      <section class="section couple-section server-only" id="chat" aria-labelledby="chat-title">
+  <h2 id="chat-title" class="section-title">Tin nhắn <em>của hai đứa</em></h2>
+  <div class="couple-panel"><p id="chat-status" role="status">Đang kết nối…</p>
+  <button class="btn btn-soft" id="chat-older" data-couple="older" hidden>Tải tin cũ hơn</button>
+  <div id="chat-messages" aria-label="Cuộc trò chuyện" tabindex="0"></div>
+  <p id="chat-context"></p><form class="form-stack" id="chat-form">
+  <label>Lời nhắn<textarea id="chat-text" name="text" maxlength="4000" placeholder="Nhắn gì đó cho người thương ♡"></textarea></label>
+  <div class="chat-fields"><label>Liên kết<input type="url" name="url" maxlength="2048" placeholder="https://"></label><label>Ảnh<input type="file" name="photo" accept="image/jpeg,image/png,image/webp,image/gif"></label></div>
+  <div class="form-actions"><button type="button" data-couple="cancel" class="btn btn-soft">Xóa nháp</button>
+  <button type="button" id="chat-retry" data-couple="retry" class="btn btn-soft" hidden>Gửi lại</button>
+  <button type="submit" class="btn btn-primary">Gửi tin ♡</button></div></form></div></section>
+  <section class="section couple-section server-only" aria-labelledby="together-title">
+  <h2 class="section-title" id="together-title">Cùng <em>nhau</em></h2>
+  <div class="together-grid"><div class="couple-panel"><h3>Câu hỏi hôm nay</h3><p id="daily-question">Đang tải…</p>
+  <form id="daily-form" class="form-stack"><label>Câu trả lời của bạn<textarea id="daily-answer" maxlength="2000" required></textarea></label><label>Ảnh minh họa<input type="file" id="daily-photo" accept="image/jpeg,image/png,image/webp,image/gif"></label><button type="button" class="btn btn-soft" data-couple="clear-daily-photo">Bỏ ảnh đã lưu</button><button class="btn btn-primary" type="submit">Lưu câu trả lời</button></form><div id="daily-answers"></div></div>
+  <div class="couple-panel"><h3>Ghim yêu thích</h3><div id="couple-pins">Đang tải…</div></div></div></section>
+
+  <section class="section calendar-section" id="calendar"><div class="section-head split-head"><div><p class="eyebrow">CHAPTER 07 — LOVE & TIME</p><h2 class="section-title">Những ngày <em>đặc biệt</em></h2><p class="section-sub">Để không bỏ lỡ bất kỳ dịp nào đáng nhớ của chúng mình.</p></div><button class="btn btn-soft" data-add="events">+ Thêm một sự kiện</button></div><div class="calendar-toolbar server-only"><button class="btn btn-soft" data-couple="prev" aria-label="Tháng trước">‹</button><b id="calendar-month"></b><button class="btn btn-soft" data-couple="next" aria-label="Tháng sau">›</button><button class="btn btn-soft" data-couple="calendar-list">Danh sách</button><button class="btn btn-soft" data-couple="calendar-month">Lịch tháng</button></div><div class="events-grid" id="event-list"></div></section>
+
+      <section class="closing-section"><div class="closing-stars">✦ &nbsp; ♡ &nbsp; ✧</div><p class="eyebrow">EVERY END IS A NEW BEGINNING</p><h2>Không cần thế giới hoàn hảo,<br/><em>chỉ cần thế giới có em.</em></h2><p>Những điều giản dị hôm nay sẽ trở thành ký ức đẹp nhất của ngày mai.</p><div class="closing-sign">Always yours, A Lương ♡ CaPu</div><a class="btn btn-primary" href="#home">Trở về nơi câu chuyện bắt đầu ↑</a></section>
+    </main>
+  <nav class="couple-mobile server-only" aria-label="Điều hướng nhanh"><a href="#home">Trang chủ</a><a href="#chat">Tin nhắn<span class="chat-count"></span></a><a href="#calendar">Lịch</a><a href="#story">Kỷ niệm</a><button data-action="settings">Cài đặt</button></nav>
+    <footer class="footer"><div class="footer-brand">♡ A Lương & CaPu <span>— Our Little Universe</span></div><div>Handcrafted with love, for the two of us.</div><div class="footer-actions"><button data-action="settings">Cài đặt</button><button data-action="export">Sao lưu</button><button data-action="logout" id="logout-button">Đăng xuất</button></div></footer>
+    <div id="demo-ribbon" class="demo-ribbon hidden">BẢN XEM TRƯỚC · Dữ liệu chỉ lưu trong trình duyệt này</div>
+    <button class="floating-music" data-action="music" title="Bật nhạc nền" aria-label="Bật nhạc nền" aria-pressed="false"><span id="music-icon" class="music-note-symbol" aria-hidden="true"><i></i></span>
+      <span class="music-notes" aria-hidden="true"><span>♪</span><span>♫</span><span>♪</span></span>
+    </button>
+    <aside id="music-panel" class="music-panel" hidden aria-labelledby="music-heading">
+      <div class="music-panel-heading"><h2 id="music-heading">Nhạc của hai đứa</h2><button type="button" class="btn btn-soft" data-action="close-music" aria-label="Đóng trình phát">✕</button></div>
+      <p class="music-current" id="music-current" hidden></p>
+      <label id="music-track-label">Bắt đầu từ bài<select id="music-track"></select></label>
+      <div id="music-embed"></div>
+      <div class="music-panel-actions">
+        <button type="button" class="btn btn-soft" data-action="previous-song" aria-label="Bài trước">‹</button><button type="button" class="btn btn-primary" data-action="play-youtube">Phát danh sách</button><button type="button" class="btn btn-soft" data-action="next-song" aria-label="Bài tiếp theo">›</button>
+        <button type="button" class="btn btn-soft" data-action="play-uploaded" hidden>Phát tệp nhạc</button>
+        <button type="button" class="btn btn-soft" data-action="edit-music">Chỉnh danh sách</button>
+        <a id="music-link" target="_blank" rel="noopener noreferrer">Mở trên YouTube ↗</a>
+      </div>
+    </aside>
+    <audio id="music-audio" preload="none"></audio>
+  </div>
+
+  <div class="modal-backdrop hidden" id="modal-backdrop"><div class="modal-window" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-top"><div><p class="eyebrow" id="modal-eyebrow">OUR LITTLE UNIVERSE</p><h2 id="modal-title">Một điều bé xinh</h2></div><button class="modal-close icon-btn" data-action="close-modal" aria-label="Đóng cửa sổ">✕</button></div><div id="modal-body"></div></div></div>
+</body>
+</html>

@@ -1,0 +1,10 @@
+fastapi>=0.110,<1
+uvicorn>=0.25,<1
+python-multipart>=0.0.9,<1
+argon2-cffi>=23.1,<27
+Pillow>=10,<13
+pymongo>=4.10,<5
+websockets>=14,<18
+
+google-auth>=2.35,<3
+requests>=2.32,<3
