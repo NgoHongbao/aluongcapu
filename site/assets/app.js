@@ -163,13 +163,18 @@ function renderCounter(){
   $('#next-anniversary').textContent='♡ Bắt đầu '+label+(next?' · Còn '+Math.ceil((next[0]-Date.now())/86400000)+' ngày đến '+next[1]:'');
 }
 function renderProfiles(){
-  for(const button of $$('[data-own-avatar]'))button.hidden=currentUser.role!=='owner'&&button.dataset.ownAvatar!==currentUser.role;
-  for(const [role,selector,letter] of [['owner','#avatar-owner','A'],['partner','#avatar-partner','C']]){
+  for(const button of $$('[data-own-avatar], [data-action="edit-person"]')){
+    const role=button.dataset.ownAvatar||button.dataset.role;
+    button.hidden=!state.users.some(user=>user.role===role);
+  }
+  for(const [role,selector] of [['owner','#avatar-owner'],['partner','#avatar-partner']]){
     const box=$(selector), key='avatar_'+role+'_media_id', src=mediaSrc(state.settings[key]);
     const profile=state.users?.find(user=>user.role===role);
     box.closest('.us-profile').querySelector('h3').textContent=person(role);
     box.closest('.us-profile').querySelector('.profile-role').textContent=profile?.nickname || (role==='owner'?'THE BOY':'THE GIRL');
-    if(src){box.innerHTML=`<img src="${src}" alt="Ảnh đại diện ${esc(person(role))}" loading="lazy">`;}else{box.textContent=person(role)[0]||letter;}
+    box.innerHTML=src
+      ? `<img src="${src}" alt="Ảnh đại diện ${esc(person(role))}" loading="lazy">`
+      : companionPortrait(role);
   }
 }
 function attachment(item){
@@ -539,6 +544,38 @@ function openPasswordForm(){
  </form>`);
 }
 
+const companionLines={
+ owner:['Chào mừng hai đứa về nhà.','Hôm nay mình giữ một kỷ niệm nhỏ nhé.','Đèn bên này sáng rồi, Pu có thấy không?'],
+ partner:['Pu tới rồi, mình thắp đèn lên nhé!','Hôm nay có chuyện gì muốn kể cho nhau không?','Mình đem theo một cái ôm nè.']
+};
+function companionPortrait(role){
+ return `<span class="companion-creature ${role==='owner'?'otter':'momonga'}" aria-hidden="true"></span>`;
+}
+const companionNames={owner:'Rái cá',partner:'Momonga'};
+const companionTurns={owner:0,partner:-1};
+function companionLine(role){
+ const lines=companionLines[role];
+ companionTurns[role]=(companionTurns[role]+1)%lines.length;
+ return lines[companionTurns[role]];
+}
+function greetCompanion(role){
+ const court=$('.auth-courtyard');
+ court.dataset.side=role;
+ court.querySelectorAll('[data-companion]').forEach(button=>
+   button.setAttribute('aria-pressed',String(button.dataset.companion===role)));
+ court.querySelector('.auth-dialogue').textContent=companionNames[role]+' · '+companionLine(role);
+}
+function editPerson(role){
+ const profile=state.users.find(user=>user.role===role);
+ if(!profile)return;
+ modal('Hồ sơ của '+profile.display_name,`<form id="profile-form" class="form-stack">
+   <input type="hidden" name="role" value="${esc(role)}">
+   <label>Tên hiển thị<input name="display_name" value="${esc(profile.display_name)}" required maxlength="60"></label>
+   <label>Biệt danh<input name="nickname" value="${esc(profile.nickname)}" maxlength="60"></label>
+   <div class="form-actions"><button type="submit" class="btn btn-primary">Lưu hồ sơ</button></div>
+ </form>`);
+}
+
 function openMemoryTrash(){
  const items=state.memory_trash||[];
  const list=items.map(item=>`<div class="settings-actions"><span>${esc(item.title)} · ${esc(datefmt(item.deleted_at))}</span><button type="button" class="btn btn-outline" data-action="restore-memory" data-id="${esc(item.id)}">Khôi phục</button></div>`).join('');
@@ -639,6 +676,15 @@ async function handleAction(action,btn){
  switch(action){
  case 'close-modal':closeModal();break;
  case 'settings':openSettings();break;
+ case 'edit-person':if(!DEMO)editPerson(btn.dataset.role);break;
+ case 'greet-companion':greetCompanion(btn.dataset.companion);break;
+ case 'companion-dialogue':{
+   const role=btn.dataset.companion;
+   modal(companionNames[role],`<div class="companion-message">${companionPortrait(role)}<p>${esc(companionLine(role))}</p></div>
+   ${DEMO?'':'<div class="form-actions"><button class="btn btn-primary" data-action="companion-chat">Mở tin nhắn</button></div>'}`);
+   break;
+ }
+ case 'companion-chat':sectionScroll('chat');location.hash='chat';$('#chat-text')?.focus({preventScroll:true});break;
  case 'search':openSearch();break;
  case 'memory-trash':if(!DEMO)openMemoryTrash();break;
  case 'restore-memory':
@@ -784,7 +830,7 @@ async function runSubmit(e){const form=e.target;
  if(form.id==='profile-form'){
    e.preventDefault();
    const values=Object.fromEntries(new FormData(form));
-   values.auto_avatar=form.elements.auto_avatar.checked;
+   if(form.elements.auto_avatar)values.auto_avatar=form.elements.auto_avatar.checked;
    try{
      await api('/profile',{method:'PATCH',body:JSON.stringify(values)});
      await reload(); closeModal(); alertToast('Đã lưu hồ sơ ♡');

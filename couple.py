@@ -26,7 +26,8 @@ def timestamp():
 class Profile(BaseModel):
     display_name: str
     nickname: str = ''
-    auto_avatar: bool = False
+    auto_avatar: bool | None = None
+    role: str | None = None
 
 
 class Message(BaseModel):
@@ -80,9 +81,14 @@ def register(core):
     @app.patch('/api/profile')
     def profile(request: Request, body: Profile):
         user = writer(request)
-        values = dict(display_name=clean(body.display_name, 60, True), nickname=clean(body.nickname, 60),
-                      auto_avatar=int(body.auto_avatar))
-        db.update('users', {'id': user['id']}, values)
+        role = body.role or user['role']
+        if role not in ('owner', 'partner'):
+            raise HTTPException(422, 'Hồ sơ không hợp lệ.')
+        values = dict(display_name=clean(body.display_name, 60, True), nickname=clean(body.nickname, 60))
+        if role == user['role'] and body.auto_avatar is not None:
+            values['auto_avatar'] = int(body.auto_avatar)
+        if not db.update('users', {'role': role}, values):
+            raise HTTPException(404, 'Người này chưa tham gia.')
         return values
 
     @app.get('/api/chat')

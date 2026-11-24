@@ -10,10 +10,11 @@
   <link rel="stylesheet" href="/assets/style.css" />
   <link rel="stylesheet" href="/assets/couple.css?v=touch" />
   <link rel="stylesheet" href="/assets/touch.css?v=responsive" />
+  <link rel="stylesheet" href="/assets/companions.css?v=portraits" />
   <link rel="stylesheet" href="/assets/garden.css?v=gift-games" />
   <script defer src="/assets/couple.js"></script>
   <script defer src="/assets/garden.js?v=1"></script>
-  <script defer src="/assets/app.js?v=responsive"></script>
+  <script defer src="/assets/app.js?v=portraits"></script>
 </head>
 <body>
   <div id="star-cursor" aria-hidden="true"></div>
@@ -24,6 +25,19 @@
 
   <div id="auth-screen" class="auth-screen hidden">
     <div class="auth-decor" aria-hidden="true"><span>✧</span><span>♡</span><span>✦</span></div>
+    <div class="auth-courtyard" data-side="owner">
+      <div class="auth-companions" aria-label="Chọn linh vật để nghe lời chào">
+        <button class="auth-companion" type="button" data-action="greet-companion" data-companion="owner" aria-pressed="true">
+          <span class="companion-creature otter" aria-hidden="true"></span>
+          <strong>Rái cá</strong><small>A Lương</small>
+        </button>
+        <button class="auth-companion" type="button" data-action="greet-companion" data-companion="partner" aria-pressed="false">
+          <span class="companion-creature momonga" aria-hidden="true"></span>
+          <strong>Momonga</strong><small>Pu</small>
+        </button>
+      </div>
+      <p class="auth-dialogue" role="status">Rái cá · Chào mừng hai đứa về nhà.</p>
+    </div>
     <div class="auth-card glass">
       <div class="auth-mark">♡</div>
       <p class="eyebrow">A PRIVATE LITTLE UNIVERSE</p>
@@ -129,6 +143,8 @@
             <div class="profile-ring profile-a"><div id="avatar-owner" class="profile-avatar">A</div></div>
             <span class="profile-role">THE BOY</span><h3>A Lương</h3>
             <button type="button" class="btn btn-soft profile-avatar-edit server-only" data-couple="avatar" data-own-avatar="owner" hidden>Đổi avatar</button>
+            <button type="button" class="btn btn-outline profile-avatar-edit server-only" data-action="edit-person" data-role="owner">Sửa hồ sơ</button>
+            <button type="button" class="profile-companion" data-action="companion-dialogue" data-companion="owner"><span aria-hidden="true">🦦</span> Rái cá</button>
           </div>
           <div class="us-center">
             <div class="us-heart" aria-hidden="true">♡</div>
@@ -139,6 +155,8 @@
             <div class="profile-ring profile-b"><div id="avatar-partner" class="profile-avatar">P</div></div>
             <span class="profile-role">THE GIRL</span><h3>Pu</h3>
             <button type="button" class="btn btn-soft profile-avatar-edit server-only" data-couple="avatar" data-own-avatar="partner" hidden>Đổi avatar</button>
+            <button type="button" class="btn btn-outline profile-avatar-edit server-only" data-action="edit-person" data-role="partner">Sửa hồ sơ</button>
+            <button type="button" class="profile-companion" data-action="companion-dialogue" data-companion="partner"><span aria-hidden="true">✦</span> Momonga</button>
           </div>
         </div>
         <div class="us-actions">

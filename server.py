@@ -703,8 +703,6 @@ def update_settings(request: Request, body: dict = Body(...)):
                 raise HTTPException(422, 'Hãy nhập ngày bắt đầu theo dạng năm-tháng-ngày.')
         elif key.endswith('_media_id'):
             val = clean_str(val,32)
-            if key == 'avatar_owner_media_id' and user['role'] != 'owner':
-                raise HTTPException(403, 'Bạn chỉ có thể đổi avatar của mình.')
             if val:
                 media = store.one('media', id=val)
                 prefix = 'audio/' if key == 'music_media_id' else 'image/'

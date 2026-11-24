@@ -99,7 +99,9 @@ def test_profile_media_calendar_and_pins(couple, app):
     assert partner.get('/api/media/' + chat_photo).status_code == 200
     partial=partner.get('/api/media/'+chat_photo, headers={'Range':'bytes=0-7'})
     assert partial.status_code == 206 and partial.content == bytes.fromhex('89504e470d0a1a0a')
-    assert partner.patch('/api/settings', headers=ph, json={'avatar_owner_media_id':chat_photo}).status_code == 403
+    assert partner.patch('/api/settings', headers=ph, json={'avatar_owner_media_id':chat_photo}).status_code == 200
+    assert owner.get('/api/data').json()['settings']['avatar_owner_media_id'] == chat_photo
+    assert owner.patch('/api/settings', headers=oh, json={'avatar_owner_media_id':profile}).status_code == 200
     partner_avatar = image('avatar')
     assert owner.patch('/api/settings', headers=oh, json={'avatar_partner_media_id':partner_avatar}).status_code == 200
     settings = partner.get('/api/data').json()['settings']
@@ -109,6 +111,12 @@ def test_profile_media_calendar_and_pins(couple, app):
     assert owner.get('/api/data').json()['settings']['avatar_owner_media_id'] != profile
     profile_name = next(x for x in partner.get('/api/data').json()['users'] if x['role'] == 'owner')
     assert (profile_name['display_name'], profile_name['nickname']) == ('Lương','Gấu')
+    changed = partner.patch('/api/profile', headers=ph, json={
+        'role':'owner','display_name':'A Lương','nickname':'Rái cá','auto_avatar':False,
+    })
+    assert changed.status_code == 200
+    updated = owner.get('/api/data').json()['user']
+    assert (updated['display_name'], updated['nickname'], updated['auto_avatar']) == ('A Lương','Rái cá',1)
     event = dict(title='Buổi hẹn', event_date='2026-11-24T19:00', repeat_rule='weekly',
                  category='date', color='lavender', location='Quán cà phê', checklist='Đặt bàn')
     assert owner.post('/api/items/events', headers=oh, json=event).status_code == 200

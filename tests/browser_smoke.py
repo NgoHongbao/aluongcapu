@@ -26,6 +26,9 @@ def run(url, executable):
             page.on('pageerror', lambda error: errors.append(str(error)))
         owner.goto(url)
         expect(owner.locator('#auth-submit')).to_be_visible()
+        owner.locator('[data-action=greet-companion][data-companion=partner]').click()
+        expect(owner.locator('.auth-courtyard')).to_have_attribute('data-side','partner')
+        expect(owner.locator('.auth-dialogue')).to_contain_text('Momonga')
         owner.locator('[name=email]').fill('desktop@example.test')
         owner.locator('[name=password]').fill('SamplePassphrase123')
         owner.locator('#auth-submit').click()
@@ -116,7 +119,7 @@ def run(url, executable):
         expect(owner.locator('#modal-backdrop')).to_be_hidden()
         expect(owner.locator('#avatar-partner img')).to_have_count(1)
         expect(owner.locator('#avatar-owner img')).to_have_count(0)
-        expect(partner.locator('[data-own-avatar=owner]')).to_be_hidden()
+        expect(partner.locator('[data-own-avatar=owner]')).to_be_visible()
         partner.locator('[data-own-avatar=partner]').click()
         partner.locator('#avatar-crop input[type=file]').set_input_files(
             {'name':'new-avatar.png','mimeType':'image/png','buffer':image_bytes()})
