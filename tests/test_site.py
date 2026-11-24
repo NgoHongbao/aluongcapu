@@ -60,13 +60,20 @@ def test_02_upload_and_export():
 
 
 def test_03_invite_and_locks():
+    assert client.get('/api/data').json()['pending_partner']['display_name']=='CaPu'
+    profile = {'display_name':'Pu', 'nickname':'Momonga'}
+    assert client.patch('/api/profile', headers={'x-csrf-token':csrf},
+                        json={'role':'partner', **profile}).status_code==200
+    assert client.get('/api/data').json()['pending_partner']==profile
     invite=client.post('/api/invite',headers={'x-csrf-token':csrf}).json()['token']
     partner=TestClient(app)
     assert partner.post('/api/auth/register',json={'email':'bad@example.test','password':'GoodPassphrase123'}).status_code==403
     r=partner.post('/api/auth/register',json={'email':'capu@example.test','password':'GoodPassphrase123','invite':invite})
     assert r.status_code==200,r.text
-    pcsrf=partner.get('/api/data').json()['csrf']
-    assert partner.get('/api/data').json()['user']['display_name']=='CaPu'
+    data=partner.get('/api/data').json()
+    pcsrf=data['csrf']
+    assert {key:data['user'][key] for key in profile}==profile
+    assert 'pending_partner' not in client.get('/api/data').json()
     # author can read scheduled letter, partner can't read it before unlock.
     letter=client.post('/api/items/letters',headers={'x-csrf-token':csrf},json={
         'title':'Một lá thư', 'body':'Lời nhắn bí mật', 'recipient_role':'partner',

@@ -12,9 +12,9 @@
   <link rel="stylesheet" href="/assets/touch.css?v=responsive" />
   <link rel="stylesheet" href="/assets/companions.css?v=portraits" />
   <link rel="stylesheet" href="/assets/garden.css?v=gift-games" />
-  <script defer src="/assets/couple.js"></script>
+  <script defer src="/assets/couple.js?v=vietnam-time"></script>
   <script defer src="/assets/garden.js?v=1"></script>
-  <script defer src="/assets/app.js?v=portraits"></script>
+  <script defer src="/assets/app.js?v=vietnam-time"></script>
 </head>
 <body>
   <div id="star-cursor" aria-hidden="true"></div>
@@ -51,6 +51,7 @@
       </form>
       <a class="btn btn-outline" id="google-login" href="/api/auth/google" hidden>Đăng nhập bằng Google</a><p class="auth-foot" id="auth-foot">Chỉ A Lương và CaPu mới có thể bước vào đây. ♡</p>
       <div id="auth-error" role="alert" class="auth-error hidden"></div>
+      <button type="button" class="auth-music btn btn-outline" data-action="music" aria-pressed="false">Bật nhạc nền</button>
     </div>
     <p class="auth-bottom">MADE WITH LOVE · FOREVER, OURS</p>
   </div>
@@ -130,6 +131,7 @@
         <p class="eyebrow center">EVERY SECOND WITH YOU MATTERS</p>
         <h2 class="section-title center">Ngày tháng có <em>đôi mình</em></h2>
         <p class="section-sub center">Mỗi giây trôi qua đều là một lý do để mỉm cười.</p>
+        <p class="section-sub center">Giờ Việt Nam · <time id="vietnam-clock"></time></p>
         <div id="day-counter" class="counter-grid"><div class="counter-placeholder"><span>♡</span><p>Chưa thiết lập ngày bắt đầu câu chuyện</p><button class="text-link" data-action="settings">Thêm ngày đặc biệt ↗</button></div></div>
         <div id="next-anniversary" class="anniversary-line"></div>
       </section>
@@ -155,7 +157,7 @@
             <div class="profile-ring profile-b"><div id="avatar-partner" class="profile-avatar">P</div></div>
             <span class="profile-role">THE GIRL</span><h3>Pu</h3>
             <button type="button" class="btn btn-soft profile-avatar-edit server-only" data-couple="avatar" data-own-avatar="partner" hidden>Đổi avatar</button>
-            <button type="button" class="btn btn-outline profile-avatar-edit server-only" data-action="edit-person" data-role="partner">Sửa hồ sơ</button>
+            <button type="button" class="btn btn-outline profile-avatar-edit server-only" data-action="edit-person" data-role="partner">Sửa hồ sơ Pu</button>
             <button type="button" class="profile-companion" data-action="companion-dialogue" data-companion="partner"><span aria-hidden="true">✦</span> Momonga</button>
           </div>
         </div>
@@ -215,12 +217,12 @@
       <div id="music-embed"></div>
       <div class="music-panel-actions">
         <button type="button" class="btn btn-soft" data-action="previous-song" aria-label="Bài trước">‹</button><button type="button" class="btn btn-primary" data-action="play-youtube">Phát danh sách</button><button type="button" class="btn btn-soft" data-action="next-song" aria-label="Bài tiếp theo">›</button>
-        <button type="button" class="btn btn-soft" data-action="play-uploaded" hidden>Phát tệp nhạc</button>
+        <button type="button" class="btn btn-soft" data-action="play-uploaded">Phát / tạm dừng nhạc nền</button>
         <button type="button" class="btn btn-soft" data-action="edit-music">Chỉnh danh sách</button>
         <a id="music-link" target="_blank" rel="noopener noreferrer">Mở trên YouTube ↗</a>
       </div>
     </aside>
-    <audio id="music-audio" preload="none"></audio>
+    <audio id="music-audio" preload="none" playsinline></audio>
   </div>
 
   <div class="modal-backdrop hidden" id="modal-backdrop"><div class="modal-window" role="dialog" aria-modal="true" aria-labelledby="modal-title"><div class="modal-top"><div><p class="eyebrow" id="modal-eyebrow">OUR LITTLE UNIVERSE</p><h2 id="modal-title">Một điều bé xinh</h2></div><button class="modal-close icon-btn" data-action="close-modal" aria-label="Đóng cửa sổ">✕</button></div><div id="modal-body"></div></div></div>

@@ -87,8 +87,12 @@ def register(core):
         values = dict(display_name=clean(body.display_name, 60, True), nickname=clean(body.nickname, 60))
         if role == user['role'] and body.auto_avatar is not None:
             values['auto_avatar'] = int(body.auto_avatar)
-        if not db.update('users', {'role': role}, values):
-            raise HTTPException(404, 'Người này chưa tham gia.')
+        with core.mutex:
+            if not db.update('users', {'role': role}, values):
+                if user['role'] != 'owner' or role != 'partner':
+                    raise HTTPException(404, 'Người này chưa tham gia.')
+                core.set_setting('pending_partner_name', values['display_name'])
+                core.set_setting('pending_partner_nickname', values['nickname'])
         return values
 
     @app.get('/api/chat')

@@ -193,6 +193,13 @@ def settings_data():
     return {**DEFAULT_SETTINGS, **{row['key']: row['value'] for row in store.find('settings')}}
 
 
+def pending_partner_profile(settings):
+    return {
+        'display_name': settings.get('pending_partner_name', 'CaPu'),
+        'nickname': settings.get('pending_partner_nickname', ''),
+    }
+
+
 def set_setting(key, value):
     store.insert('settings', dict(key=key, value=value), ignore=True)
     store.update('settings', {'key': key}, {'value': value})
@@ -317,6 +324,11 @@ def health():
     return {'ok': True, 'name': 'Our Little Universe'}
 
 
+@app.get('/api/time')
+def server_time():
+    return {'utc': datetime.now(timezone.utc).isoformat(timespec='milliseconds')}
+
+
 @app.get('/api/auth/status')
 def status(request: Request):
     count = store.count('users')
@@ -346,13 +358,13 @@ def register(body: Credentials, response: Response):
                                    expires_at={'$gt': int(time.time())}, used_at=None)
             if not invitation:
                 raise HTTPException(403, 'Cần lời mời hợp lệ từ A Lương.')
-        display_name = 'A Lương' if count == 0 else 'CaPu'
+        profile = {'display_name': 'A Lương', 'nickname': ''} if count == 0 else pending_partner_profile(settings_data())
         role = 'owner' if count == 0 else 'partner'
         uid = uuid.uuid4().hex
         try:
-            store.insert('users', dict(id=uid, email=email, display_name=display_name, role=role,
+            store.insert('users', dict(id=uid, email=email, role=role,
                                       password_hash=ph.hash(body.password), created_at=utcnow(),
-                                      nickname='', auto_avatar=0))
+                                      auto_avatar=0, **profile))
         except sqlite3.IntegrityError:
             raise HTTPException(409, 'Tài khoản đã tồn tại.')
         if count == 1:
@@ -603,6 +615,8 @@ def data(request: Request):
     payload['media'] = [public_media(row) for row in store.find('media', sort=(('created_at', -1),)) if media_visible(row, user)]
     payload['users'] = [{k: row.get(k, '') for k in ('id','display_name','role','nickname')}
                         for row in store.find('users')]
+    if user['role'] == 'owner' and not any(row['role']=='partner' for row in payload['users']):
+        payload['pending_partner'] = pending_partner_profile(settings)
     return {'user': {k:user.get(k, '') for k in ('id','email','display_name','role','nickname','auto_avatar')},
             'csrf': user['csrf'], 'settings': settings,
             'google_enabled': google_login.enabled(), **payload}

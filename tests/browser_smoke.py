@@ -23,6 +23,7 @@ def run(url, executable):
         owner, partner = desktop.new_page(), mobile.new_page()
         for page in (owner, partner):
             page.clock.set_fixed_time(datetime(2026, 11, 24, 12, tzinfo=timezone.utc))
+            page.route('**/api/time', lambda route: route.fulfill(json={'utc':'2026-11-24T12:00:00Z'}))
             page.on('pageerror', lambda error: errors.append(str(error)))
         owner.goto(url)
         expect(owner.locator('#auth-submit')).to_be_visible()
@@ -33,6 +34,12 @@ def run(url, executable):
         owner.locator('[name=password]').fill('SamplePassphrase123')
         owner.locator('#auth-submit').click()
         expect(owner.locator('#app')).to_be_visible()
+        expect(owner.locator('#vietnam-clock')).to_contain_text('19:00:')
+        owner.locator('[data-action=edit-person][data-role=partner]').click()
+        owner.locator('#profile-form [name=nickname]').fill('Momonga')
+        owner.locator('#profile-form button[type=submit]').click()
+        expect(owner.locator('#modal-backdrop')).to_be_hidden()
+        expect(owner.locator('#avatar-partner').locator('xpath=../..')).to_contain_text('Momonga')
         credentials = owner.request.get(url + '/api/data').json()
         invitation = owner.request.post(url+'/api/invite', headers={'X-CSRF-Token':credentials['csrf']})
         partner.goto(url+'/?invite='+quote(invitation.json()['token']) if invitation.ok else url)
@@ -40,6 +47,7 @@ def run(url, executable):
         partner.locator('[name=password]').fill('SamplePassphrase123')
         partner.locator('#auth-submit').click()
         expect(partner.locator('#app')).to_be_visible()
+        assert partner.request.get(url+'/api/auth/status').json()['user']['nickname']=='Momonga'
         expect(partner.locator('.couple-mobile')).to_be_visible()
         owner.locator('.nav-links a[href="#us"]').click()
         expect(owner.locator('#us-title')).to_be_in_viewport()

@@ -24,10 +24,10 @@ html = html.replace('<link rel="icon" type="image/svg+xml" href="/assets/favicon
                     '<link rel="icon" type="image/svg+xml" href="data:image/svg+xml,' + quote(favicon) + '" />')
 html = html.replace('<link rel="stylesheet" href="/assets/style.css" />',
                     '<style>\n' + css + '\n</style>')
-html = html.replace('<script defer src="/assets/couple.js"></script>', '')
+html = html.replace('<script defer src="/assets/couple.js?v=vietnam-time"></script>', '')
 html = html.replace('<script defer src="/assets/garden.js?v=1"></script>', '')
 # Inline scripts in <head> cannot use "defer". Move this script to the end of body.
-html = html.replace('<script defer src="/assets/app.js?v=portraits"></script>', '')
+html = html.replace('<script defer src="/assets/app.js?v=vietnam-time"></script>', '')
 html = html.replace('</body>', '<script>\n' + garden + '\n' + js + '\n</script>\n</body>')
 output = ROOT/'A_Luong_CaPu_Xem_Truoc.html'
 output.write_text(html, encoding='utf-8')

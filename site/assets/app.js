@@ -18,11 +18,24 @@ const esc = x => String(x ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt
 const nl = x => esc(x).replace(/\n/g,'<br>');
 const short = (s,n=100) => String(s||'').length > n ? String(s).slice(0,n)+'…' : String(s||'');
 const uuid = () => crypto.randomUUID ? crypto.randomUUID().replaceAll('-','') : Math.random().toString(36).slice(2)+Date.now().toString(36);
-const now = () => new Date().toISOString();
-const datefmt = (s,mode='short') => { if(!s) return 'Chưa có ngày'; const d = new Date(s); if(isNaN(d.getTime()))return String(s); return new Intl.DateTimeFormat('vi-VN',mode==='short'?{day:'2-digit',month:'2-digit',year:'numeric'}:{day:'numeric',month:'long',year:'numeric'}).format(d); };
-const isoForDate = s => s ? new Date(s).toISOString() : '';
+const vietnamZone='Asia/Ho_Chi_Minh';
+const vietnamDateTime=new Intl.DateTimeFormat('sv-SE',{timeZone:vietnamZone,dateStyle:'short',timeStyle:'medium'});
+const vietnamClockFormat=new Intl.DateTimeFormat('vi-VN',{timeZone:vietnamZone,dateStyle:'full',timeStyle:'medium',hour12:false});
+let serverClock=null;
+const currentTime=()=>serverClock?new Date(serverClock.epoch+performance.now()-serverClock.received):new Date();
+const now=()=>currentTime().toISOString();
+const parseDate=s=>new Date(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?$/.test(s)?s+'+07:00':s);
+const datefmt = (s,mode='short') => {
+ if(!s)return 'Chưa có ngày';
+ const d=parseDate(s);
+ if(isNaN(d.getTime()))return String(s);
+ return new Intl.DateTimeFormat('vi-VN',{timeZone:vietnamZone,day:mode==='short'?'2-digit':'numeric',
+   month:mode==='short'?'2-digit':'long',year:'numeric'}).format(d);
+};
+const isoForDate = s => s ? parseDate(s).toISOString() : '';
 const otherRole = () => currentUser.role === 'owner' ? 'partner' : 'owner';
-const person = role => state.users?.find(user=>user.role===role)?.display_name || (role==='owner'?'A Lương':'CaPu');
+const profileFor = role => state.users?.find(user=>user.role===role) || (role==='partner'?state.pending_partner:undefined);
+const person = role => profileFor(role)?.display_name || (role==='owner'?'A Lương':'CaPu');
 const itsMine = item => item.created_by === currentUser.id;
 const el = (tag, attrs={}, txt='') => {const a=document.createElement(tag);Object.entries(attrs).forEach(([k,v])=>a.setAttribute(k,v));a.textContent=txt;return a;};
 function emptyState(message, action='', table=''){ return `<div class="empty-state"><span class="empty-symbol">♡</span><p>${esc(message)}</p>${action?`<button data-add="${table}">${esc(action)} ↗</button>`:''}</div>`; }
@@ -137,6 +150,9 @@ function openHeroPhoto(key){
   </form>`);
 }
 function renderCounter(){
+  const current=currentTime(), clock=$('#vietnam-clock');
+  clock.dateTime=current.toISOString();
+  clock.textContent=vietnamClockFormat.format(current);
   const val=state.settings.start_date;
   const node=$('#day-counter');
   $('#us-days').hidden=!val;
@@ -144,32 +160,36 @@ function renderCounter(){
   const dateButton=$('#us [data-action=love-date]');
   const dateAction=val?'Sửa ngày yêu':'Đặt ngày yêu';
   if(dateButton.textContent!==dateAction)dateButton.textContent=dateAction;
-  if(!val){node.innerHTML='<div class="counter-placeholder"><span>♡</span><p>Chưa thiết lập ngày bắt đầu câu chuyện</p><button class="text-link" data-action="love-date">Đặt ngày yêu ↗</button></div>';$('#next-anniversary').textContent='';return;}
+  if(!val){
+    if(!node.querySelector('[data-action="love-date"]'))node.innerHTML='<div class="counter-placeholder"><span>♡</span><p>Chưa thiết lập ngày bắt đầu câu chuyện</p><button class="text-link" data-action="love-date">Đặt ngày yêu ↗</button></div>';
+    $('#next-anniversary').textContent='';
+    return;
+  }
   const start=new Date(val.slice(0,10)+'T00:00:00+07:00');if(isNaN(start.getTime()))return;
-  const diff=Math.max(0,Date.now()-start.getTime());const day=Math.floor(diff/86400000);const hour=Math.floor((diff%86400000)/3600000);const minute=Math.floor((diff%3600000)/60000);const second=Math.floor((diff%60000)/1000);
+  const diff=Math.max(0,current-start);const day=Math.floor(diff/86400000);const hour=Math.floor((diff%86400000)/3600000);const minute=Math.floor((diff%3600000)/60000);const second=Math.floor((diff%60000)/1000);
   const count=new Intl.NumberFormat('vi-VN').format(day);
   const dateLabel=val.slice(0,10).split('-').reverse().join('/');
   if($('#us-day-count').textContent!==count)$('#us-day-count').textContent=count;
   const since='Từ '+dateLabel;
   if($('#us-since').textContent!==since)$('#us-since').textContent=since;
   const units=[[day,'ngày'],[hour,'giờ'],[minute,'phút'],[second,'giây']];node.innerHTML=units.map(([v,label])=>`<div class="counter-box"><strong>${String(v).padStart(2,'0')}</strong><span>${label}</span></div>`).join('');
-  const year = Number(new Intl.DateTimeFormat('en',{year:'numeric',timeZone:'Asia/Ho_Chi_Minh'}).format(new Date()));
+  const year = Number(vietnamDateTime.format(current).slice(0,4));
   const suffix = val.slice(4,10)+'T00:00:00+07:00';
   let anniversary = new Date(year+suffix);
-  if (anniversary < new Date()) anniversary = new Date((year+1)+suffix);
+  if (anniversary < current) anniversary = new Date((year+1)+suffix);
   const milestones = [[anniversary,'kỷ niệm hằng năm'],...[100,365,1000].map(n=>[new Date(start.getTime()+n*86400000),n+' ngày bên nhau'])];
-  const next=milestones.filter(([date])=>date>=new Date() && date>start).sort((a,b)=>a[0]-b[0])[0];
+  const next=milestones.filter(([date])=>date>=current && date>start).sort((a,b)=>a[0]-b[0])[0];
   const label = val.slice(0,10).split('-').reverse().join('/');
-  $('#next-anniversary').textContent='♡ Bắt đầu '+label+(next?' · Còn '+Math.ceil((next[0]-Date.now())/86400000)+' ngày đến '+next[1]:'');
+  $('#next-anniversary').textContent='♡ Bắt đầu '+label+(next?' · Còn '+Math.ceil((next[0]-current)/86400000)+' ngày đến '+next[1]:'');
 }
 function renderProfiles(){
   for(const button of $$('[data-own-avatar], [data-action="edit-person"]')){
     const role=button.dataset.ownAvatar||button.dataset.role;
-    button.hidden=!state.users.some(user=>user.role===role);
+    button.hidden=!profileFor(role);
   }
   for(const [role,selector] of [['owner','#avatar-owner'],['partner','#avatar-partner']]){
     const box=$(selector), key='avatar_'+role+'_media_id', src=mediaSrc(state.settings[key]);
-    const profile=state.users?.find(user=>user.role===role);
+    const profile=profileFor(role);
     box.closest('.us-profile').querySelector('h3').textContent=person(role);
     box.closest('.us-profile').querySelector('.profile-role').textContent=profile?.nickname || (role==='owner'?'THE BOY':'THE GIRL');
     box.innerHTML=src
@@ -214,8 +234,37 @@ let musicTracks=[];
 let musicConfig='';
 let audioTracks=[];
 let waitingForGesture=false;
+let backgroundEnabled=true;
 let currentAudioIndex=0;
 const musicVolumeKey='our-universe-music-volume';
+const ambientTracks=[
+ {id:'ambient-lantern',original_name:'Đèn trước hiên',notes:[67,71,74,76,74,71,69,67,64,67,71,72,71,67,69,74]},
+ {id:'ambient-moon',original_name:'Trăng bên cửa',notes:[72,76,79,76,74,71,69,67,69,72,76,74,72,69,67,64]},
+];
+function ambientSource(track){
+ if(track.src)return track.src;
+ const rate=12000,beat=.67,duration=track.notes.length*beat+1.5;
+ const samples=new Float32Array(Math.ceil(duration*rate));
+ track.notes.forEach((note,index)=>{
+   const start=Math.round(index*beat*rate);
+   const frequency=440*2**((note-69)/12);
+   for(let i=0;i<rate*1.5&&start+i<samples.length;i++){
+     const t=i/rate,phase=t*frequency*2*Math.PI;
+     const envelope=Math.min(1,t/.055)*Math.exp(-3.15*t);
+     samples[start+i]+=.22*envelope*(Math.sin(phase)+.16*Math.sin(phase*2)+.17*Math.sin(phase*.5));
+   }
+ });
+ const wav=new DataView(new ArrayBuffer(44+samples.length*2));
+ const write=(offset,value)=>Array.from(value).forEach((letter,i)=>wav.setUint8(offset+i,letter.charCodeAt(0)));
+ write(0,'RIFF');wav.setUint32(4,wav.byteLength-8,true);write(8,'WAVEfmt ');
+ wav.setUint32(16,16,true);wav.setUint16(20,1,true);wav.setUint16(22,1,true);
+ wav.setUint32(24,rate,true);wav.setUint32(28,rate*2,true);
+ wav.setUint16(32,2,true);wav.setUint16(34,16,true);
+ write(36,'data');wav.setUint32(40,samples.length*2,true);
+ samples.forEach((sample,index)=>wav.setInt16(44+index*2,Math.round(sample*32767),true));
+ track.src=URL.createObjectURL(new Blob([wav],{type:'audio/wav'}));
+ return track.src;
+}
 function youtubeId(value){
  const raw=String(value||'').trim();
  const format=/^[A-Za-z0-9_-]{11}$/;
@@ -248,6 +297,7 @@ function embedMusic(target, tracks, loop){
 }
 function stopMusic(){
  $('#music-embed').replaceChildren();
+ backgroundEnabled=false;
  waitingForGesture=false;
  $('#music-audio').pause();
  updateSpeaker();
@@ -301,10 +351,13 @@ function updateSpeaker(){
  button.setAttribute('aria-pressed',String(playing));
  button.setAttribute('aria-label',playing?'Tắt nhạc nền':'Bật nhạc nền');
  button.title=button.getAttribute('aria-label');
+ const authButton=$('.auth-music');
+ authButton.textContent=playing?'Tắt nhạc nền':'Bật nhạc nền';
+ authButton.setAttribute('aria-pressed',String(playing));
  const song=audioTracks[currentAudioIndex];
  const current=$('#music-current');
  current.hidden=!song;
- current.textContent=song?(playing?'Đang phát':'Đã chọn')+' · Bài '+(currentAudioIndex+1)+'/'+audioTracks.length:'';
+ current.textContent=song?(playing?'Đang phát':'Đã chọn')+' · '+song.original_name+' · '+(currentAudioIndex+1)+'/'+audioTracks.length:'';
 }
 async function playUploaded(){
  $('#music-embed').replaceChildren();
@@ -317,28 +370,30 @@ function selectAudio(index){
  currentAudioIndex=index;
  const player=$('#music-audio');
  const track=audioTracks[index];
- if(track)player.src=mediaSrc(track.id,false);
+ if(track)player.src=track.notes?ambientSource(track):mediaSrc(track.id,false);
  else player.removeAttribute('src');
  updateSpeaker();
 }
 function tryBackgroundMusic(){
- playUploaded().catch(error=>{ waitingForGesture=error.name==='NotAllowedError'; });
+ if(backgroundEnabled&&audioTracks.length)
+   playUploaded().catch(error=>{waitingForGesture=backgroundEnabled&&error.name==='NotAllowedError';});
 }
 function renderMusic(){
  renderPlaylist();
- const preferred=state.settings.music_media_id;
- const ids=[...new Set([preferred,...(state.settings.music_media_ids||'').split(/\s+/)])].filter(Boolean);
- const next=ids.map(id=>state.media.find(item=>item.id===id&&item.mime.startsWith('audio/'))).filter(Boolean);
- $('[data-action=play-uploaded]').hidden=!next.length;
+ const music=state.media.filter(item=>item.mime.startsWith('audio/'));
+ const configured=(state.settings.music_media_ids||'').split(/\s+/).filter(Boolean);
+ const ids=[...new Set([state.settings.music_media_id,...(configured.length?configured:music.map(track=>track.id))])].filter(Boolean);
+ const uploaded=ids.length?ids.map(id=>music.find(item=>item.id===id)).filter(Boolean):music;
+ updateBackgroundTracks(uploaded.length?uploaded:ambientTracks);
+}
+function updateBackgroundTracks(next){
  if(next.map(t=>t.id).join()===audioTracks.map(t=>t.id).join())return;
  const previous=audioTracks[currentAudioIndex]?.id;
- const hadTracks=audioTracks.length>0;
- const wasPlaying=!$('#music-audio').paused;
  audioTracks=next;
  const retained=next.findIndex(track=>track.id===previous);
  if(retained>=0){currentAudioIndex=retained;updateSpeaker();return;}
  selectAudio(0);
- if(next.length&&(!hadTracks||wasPlaying))tryBackgroundMusic();
+ tryBackgroundMusic();
 }
 function modal(title,body,eyebrow='OUR LITTLE UNIVERSE',wide=false){currentModal=title;$('#modal-eyebrow').textContent=eyebrow;$('#modal-title').textContent=title;$('#modal-body').innerHTML=body;$('.modal-window').classList.toggle('wide',wide);$('#modal-backdrop').classList.remove('hidden');document.body.style.overflow='hidden';setTimeout(()=>$('#modal-body input,#modal-body textarea,#modal-body button')?.focus(),50);}
 function closeModal(){$('#gift-music-embed')?.replaceChildren();$('#modal-backdrop').classList.add('hidden');document.body.style.overflow='';currentModal='';}
@@ -360,7 +415,7 @@ function inputField(table,def,item){const [key,label,type,extra]=def;let value=i
  if(table==='events' && key==='remind_at' && value) value=value.slice(11,16);
  if(type==='select-values')return `<label>${label}<select name="${key}">${Object.entries(extra).map(([k,v])=>`<option value="${k}" ${value===k?'selected':''}>${v}</option>`).join('')}</select></label>`;
  if(key==='music_youtube'&&value){const id=youtubeId(value);if(id)value=youtubeWatch(id);}
- if(key==='unlock_at'&&value){const date=new Date(value);if(!isNaN(date))value=new Date(date.getTime()-date.getTimezoneOffset()*60000).toISOString().slice(0,16);}
+ if(key==='unlock_at'&&value){const date=new Date(value);if(!isNaN(date))value=vietnamDateTime.format(date).replace(' ','T').slice(0,16);}
  let content='';const attrs=`name="${key}" id="f-${key}" ${extra===true?'required':''}`;
  if(type==='textarea')content=`<textarea ${attrs} placeholder="Viết bằng tất cả chân thành...">${esc(value)}</textarea>`;
  else if(type==='checkbox')content=`<input type="checkbox" ${attrs} ${value?'checked':''}/>`;
@@ -566,13 +621,14 @@ function greetCompanion(role){
  court.querySelector('.auth-dialogue').textContent=companionNames[role]+' · '+companionLine(role);
 }
 function editPerson(role){
- const profile=state.users.find(user=>user.role===role);
+ const profile=profileFor(role);
  if(!profile)return;
  modal('Hồ sơ của '+profile.display_name,`<form id="profile-form" class="form-stack">
    <input type="hidden" name="role" value="${esc(role)}">
+   ${profile===state.pending_partner?'<p class="modal-description">Pu chưa đăng ký. Hồ sơ này sẽ được dùng khi Pu tham gia.</p>':''}
    <label>Tên hiển thị<input name="display_name" value="${esc(profile.display_name)}" required maxlength="60"></label>
    <label>Biệt danh<input name="nickname" value="${esc(profile.nickname)}" maxlength="60"></label>
-   <div class="form-actions"><button type="submit" class="btn btn-primary">Lưu hồ sơ</button></div>
+   <div class="form-actions">${profile===state.pending_partner?'<button type="button" class="btn btn-outline" data-settingstab="people">Mời Pu tham gia</button>':''}<button type="submit" class="btn btn-primary">Lưu hồ sơ</button></div>
  </form>`);
 }
 
@@ -725,7 +781,7 @@ async function handleAction(action,btn){
  case 'music':{
   if(!audioTracks.length){openMusicSettings();alertToast('Tải tệp MP3 hoặc WAV để dùng nhạc nền.');break;}
   if(!$('#music-audio').paused){stopMusic();break;}
-  await playUploaded();break;
+  backgroundEnabled=true;await playUploaded();break;
  }
  case 'music-options':closeModal();$('#music-panel').hidden=false;break;
  case 'close-music':$('#music-panel').hidden=true;$('#music-embed').replaceChildren();break;
@@ -735,7 +791,7 @@ async function handleAction(action,btn){
  case 'play-youtube':playYoutube();break;
  case 'play-uploaded':{
   const audio=$('#music-audio');if(!audio.paused){stopMusic();break;}
-  stopMusic();$('#gift-music-embed')?.replaceChildren();
+  stopMusic();backgroundEnabled=true;$('#gift-music-embed')?.replaceChildren();
   try{await playUploaded();}
   catch{alertToast('Trình duyệt chưa phát được tệp nhạc.');}break;
  }
@@ -850,7 +906,7 @@ function setupAuth(status){$('#auth-screen').classList.remove('hidden');$('#app'
  $('#auth-foot').textContent=status.setup_needed?'A Lương tạo tài khoản đầu tiên. Sau đó mời CaPu qua liên kết riêng.':authInvite?'Lời mời chỉ sử dụng một lần và có thời hạn 24 giờ.':'Chỉ A Lương và CaPu mới có thể bước vào đây. ♡';
 }
 async function init(){
- if(!DEMO)couple=window.createCoupleTools({api,$,esc,toast:alertToast,attachment,getState:()=>state,getUser:()=>currentUser,patchSettings,modal,closeModal,createItem});
+ if(!DEMO)couple=window.createCoupleTools({api,$,esc,toast:alertToast,attachment,getState:()=>state,getUser:()=>currentUser,patchSettings,modal,closeModal,createItem,currentTime});
  const musicAudio=$('#music-audio');
  try{
    const saved=localStorage.getItem(musicVolumeKey);
@@ -870,12 +926,15 @@ async function init(){
    selectAudio((currentAudioIndex+1)%audioTracks.length);
    tryBackgroundMusic();
  });
- document.addEventListener('click',event=>{
-   if(waitingForGesture&&!event.target.closest('[data-action=music],[data-action=gift-music],[data-action=play-youtube]')){
+ const retryMusic=event=>{
+   if(waitingForGesture&&!event.target.closest('[data-action=music],[data-action=gift-music],[data-action=play-youtube],[data-action=play-uploaded]')){
      waitingForGesture=false;
      tryBackgroundMusic();
    }
- });
+ };
+ document.addEventListener('click',retryMusic);
+ document.addEventListener('keydown',event=>{if(!event.repeat&&event.key!=='Escape')retryMusic(event);});
+ updateBackgroundTracks(ambientTracks);
  $('#music-track').addEventListener('change',updateMusicLink);
  initPetals();document.addEventListener('click',runClick);document.addEventListener('submit',runSubmit);
  $('#file-input').addEventListener('change',async e=>{await uploadFiles(e.target.files);e.target.value='';});
@@ -887,8 +946,19 @@ async function init(){
  window.addEventListener('scroll',()=>$('#navbar')?.classList.toggle('shrink',scrollY>40),{passive:true});
  if(DEMO){loadDemo();$('#auth-screen').classList.add('hidden');$('#demo-ribbon').classList.remove('hidden');showApp();}
  else{try{const status=await api('/auth/status');if(status.logged_in){state=await api('/data');currentUser=state.user;csrf=state.csrf;showApp();const googleResult=new URLSearchParams(location.search).get('google');if(googleResult){alertToast(googleResult==='linked'?'Đã liên kết tài khoản Google':'Chưa thể liên kết Google. Hãy thử lại.');const url=new URL(location.href);url.searchParams.delete('google');history.replaceState(null,'',url);}}else setupAuth(status);}catch(err){setupAuth({setup_needed:false});$('#auth-error').textContent=err.message;$('#auth-error').classList.remove('hidden');}}
- clockTimer=setInterval(()=>{if(!$('#app').classList.contains('hidden')&&state.settings?.start_date)renderCounter();},1000);
+ clockTimer=setInterval(()=>{if(!$('#app').classList.contains('hidden')&&state.settings)renderCounter();},1000);
  if(!DEMO){
+   const syncClock=async()=>{
+     const sent=performance.now();
+     try{
+       const {utc}=await api('/time');
+       const epoch=Date.parse(utc),received=performance.now();
+       if(Number.isFinite(epoch))serverClock={epoch:epoch+(received-sent)/2,received};
+     }catch{}
+   };
+   syncClock();
+   setInterval(syncClock,5*60*1000);
+   document.addEventListener('visibilitychange',()=>{if(!document.hidden)syncClock();});
    setInterval(refreshShared,5000);
    document.addEventListener('visibilitychange',refreshShared);
    window.addEventListener('online',refreshShared);

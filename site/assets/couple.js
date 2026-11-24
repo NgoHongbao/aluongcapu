@@ -1,8 +1,8 @@
 'use strict';
-window.createCoupleTools = ({api, $, esc, toast, attachment, getState, getUser, patchSettings, modal, closeModal, createItem}) => {
+window.createCoupleTools = ({api, $, esc, toast, attachment, getState, getUser, patchSettings, modal, closeModal, createItem, currentTime}) => {
   const messages = new Map();
   let socket, catchup, pending, reply, editing, connected = false, unread = 0;
-  let calendarView = 'list', calendarMonth = vietnamDay().slice(0, 7);
+  let calendarView = 'list', calendarMonth;
   const reminders = new Set();
   const order = () => [...messages.values()].sort((a,b) => a.created_at.localeCompare(b.created_at));
   const photo = (id, thumb = false) => '/api/media/' + encodeURIComponent(id) + (thumb ? '?thumb=true' : '');
@@ -127,7 +127,8 @@ window.createCoupleTools = ({api, $, esc, toast, attachment, getState, getUser, 
 
   async function avatar(source, role = getUser().role) {
     const photos = getState().media.filter(item => item.mime.startsWith('image/') && (!item.purpose || item.purpose === 'gallery'));
-    const displayName = getState().users.find(user=>user.role===role)?.display_name || (role==='partner'?'Pu':'A Lương');
+    const displayName = getState().users.find(user=>user.role===role)?.display_name ||
+      (role==='partner'?(getState().pending_partner?.display_name||'Pu'):'A Lương');
     modal('Ảnh đại diện của ' + displayName, `<form id="avatar-crop" class="form-stack">
       ${source ? '' : '<label>Tải ảnh<input name="source" type="file" accept="image/jpeg,image/png,image/webp,image/gif"></label>'}
       ${!source && photos.length ? `<label>Hoặc chọn ảnh trong album<select name="album_photo"><option value="">Chọn ảnh</option>${photos.map(item=>`<option value="${esc(item.id)}">${esc(item.caption || item.original_name)}</option>`).join('')}</select></label>` : ''}
@@ -196,7 +197,7 @@ window.createCoupleTools = ({api, $, esc, toast, attachment, getState, getUser, 
     toast('Đã ghim ♡');
   }
 
-  function vietnamDay(value = new Date()) {
+  function vietnamDay(value = currentTime()) {
     return new Intl.DateTimeFormat('sv-SE',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).format(value);
   }
 
@@ -228,9 +229,10 @@ window.createCoupleTools = ({api, $, esc, toast, attachment, getState, getUser, 
         events.push({title:days+' ngày bên nhau',event_date:date.toISOString().slice(0,10)});
       }
     }
-    const [year,month] = calendarMonth.split('-').map(Number);
+    const visibleMonth = calendarMonth || today.slice(0,7);
+    const [year,month] = visibleMonth.split('-').map(Number);
     const last = new Date(Date.UTC(year,month,0)).getUTCDate();
-    const first = calendarMonth + '-01', end = calendarMonth + '-' + last;
+    const first = visibleMonth + '-01', end = visibleMonth + '-' + last;
     const times = events.flatMap(event => occurrences(event,first,end).map(day => ({day,event})))
       .sort((a,b) => (a.day+a.event.event_date.slice(10)).localeCompare(b.day+b.event.event_date.slice(10)));
     $('#calendar-month').textContent = 'Tháng '+month+' / '+year;
@@ -255,7 +257,7 @@ window.createCoupleTools = ({api, $, esc, toast, attachment, getState, getUser, 
       list.innerHTML = ['T2','T3','T4','T5','T6','T7','CN'].map(d=>`<b>${d}</b>`).join('') + '<div></div>'.repeat(offset) +
         Array.from({length:last}, (_,i) => `<div class="calendar-cell"><strong>${i+1}</strong>${times.filter(x=>Number(x.day.slice(8))===i+1).map(card).join('')}</div>`).join('');
     }
-    const current = new Date();
+    const current = currentTime();
     for (const e of events) {
       if (!e.remind_at || !occurrences(e,today,today).length) continue;
       const time = e.remind_at.slice(11,16);
@@ -345,7 +347,7 @@ window.createCoupleTools = ({api, $, esc, toast, attachment, getState, getUser, 
         case 'calendar-month': calendarView=action.slice(9); renderCalendar(); break;
         case 'prev':
         case 'next': {
-          const [y,m]=calendarMonth.split('-').map(Number);
+          const [y,m]=(calendarMonth||vietnamDay().slice(0,7)).split('-').map(Number);
           calendarMonth=new Date(Date.UTC(y,m+(action==='prev'?-2:0),1)).toISOString().slice(0,7);
           renderCalendar(); break;
         }
