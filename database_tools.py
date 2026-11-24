@@ -111,7 +111,7 @@ def backup(store, media_path, output, *, gridfs=False):
             raise
 
 
-def restore(store, source, destination, *, gridfs=False):
+def restore(store, source, destination, *, gridfs=False, dry_run=False):
     media = PrivateMedia(destination, store.mongo if gridfs else None)
     if any(store.count(table) for table in TABLES):
         raise ValueError('Restore requires an empty MongoDB database.')
@@ -124,8 +124,13 @@ def restore(store, source, destination, *, gridfs=False):
             raise ValueError('Unexpected backup contents.')
         names = file_names(records)
         import_records(store, records, dry_run=True)
+        archive_names = archive.namelist()
+        if len(set(archive_names)) != len(archive_names):
+            raise ValueError('Backup contains duplicate archive entries.')
         if archive.testzip() is not None:
             raise ValueError('Damaged backup.')
+        if missing := {f'private_uploads/{name}' for name in names} - set(archive_names):
+            raise ValueError(f'Backup is missing {len(missing)} media files.')
         for name in names:
             with archive.open(f'private_uploads/{name}') as stream:
                 if gridfs:
@@ -137,6 +142,8 @@ def restore(store, source, destination, *, gridfs=False):
                         continue
                 else:
                     copy_file(stream, destination / name, dry_run=True)
+        if dry_run:
+            return {**{table: len(rows) for table, rows in records.items()}, 'files': len(names)}
         for name in names:
             with archive.open(f'private_uploads/{name}') as stream:
                 if gridfs:
@@ -158,7 +165,9 @@ def main():
     migration.add_argument('--source-media', type=Path)
     migration.add_argument('--dry-run', action='store_true')
     command.add_parser('backup').add_argument('archive', type=Path)
-    command.add_parser('restore').add_argument('archive', type=Path)
+    recovery = command.add_parser('restore')
+    recovery.add_argument('archive', type=Path)
+    recovery.add_argument('--dry-run', action='store_true')
     args = parser.parse_args()
     dry_run = args.command == 'migrate' and args.dry_run
     uri = os.getenv('MONGODB_URI', '')
@@ -178,7 +187,9 @@ def main():
         elif args.command == 'backup':
             backup(store, destination, args.archive, gridfs=gridfs)
         else:
-            restore(store, args.archive, destination, gridfs=gridfs)
+            result = restore(store, args.archive, destination, gridfs=gridfs, dry_run=args.dry_run)
+            if args.dry_run:
+                print(json.dumps(result, indent=2))
     except Exception as error:
         print(f'{type(error).__name__}: {error}', file=sys.stderr)
         return 1

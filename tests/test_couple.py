@@ -100,6 +100,11 @@ def test_profile_media_calendar_and_pins(couple, app):
     partial=partner.get('/api/media/'+chat_photo, headers={'Range':'bytes=0-7'})
     assert partial.status_code == 206 and partial.content == bytes.fromhex('89504e470d0a1a0a')
     assert partner.patch('/api/settings', headers=ph, json={'avatar_owner_media_id':chat_photo}).status_code == 403
+    partner_avatar = image('avatar')
+    assert owner.patch('/api/settings', headers=oh, json={'avatar_partner_media_id':partner_avatar}).status_code == 200
+    settings = partner.get('/api/data').json()['settings']
+    assert settings['avatar_owner_media_id'] == profile
+    assert settings['avatar_partner_media_id'] == partner_avatar
     assert image('profile') != profile
     assert owner.get('/api/data').json()['settings']['avatar_owner_media_id'] != profile
     profile_name = next(x for x in partner.get('/api/data').json()['users'] if x['role'] == 'owner')
@@ -113,6 +118,25 @@ def test_profile_media_calendar_and_pins(couple, app):
     assert partner.get('/api/together').json()['answers'][0]['text'] == 'Buổi hẹn đầu tiên'
     assert owner.put('/api/together/pins', headers=oh, json={'kind':'media','target':chat_photo}).status_code == 200
     assert partner.get('/api/together').json()['pins'][0]['media_id'] == chat_photo
+
+def test_shared_memory_trash(couple):
+    (owner, oh, _), (partner, ph, _) = couple
+    memory = owner.post('/api/items/memories', headers=oh, json={'title': 'Bên nhau'}).json()
+    path = '/api/items/memories/' + memory['id']
+    for _ in range(2):
+        assert owner.delete(path, headers=oh).status_code == 200
+    deleted = partner.get('/api/data').json()
+    assert not deleted['memories']
+    assert deleted['memory_trash'][0]['id'] == memory['id']
+    assert partner.patch(path, headers=ph, json={'title': 'Bản mới'}).status_code == 404
+    restore = '/api/memories/' + memory['id'] + '/restore'
+    assert partner.post(restore).status_code == 403
+    assert partner.post(restore, headers=ph).status_code == 200
+    assert partner.post(restore, headers=ph).status_code == 200
+    restored = owner.get('/api/data').json()
+    assert not restored['memory_trash']
+    assert restored['memories'][0]['title'] == 'Bên nhau'
+
 
 def test_sealed_and_shared_attachments(couple):
     (owner, oh, _), (partner, ph, _) = couple

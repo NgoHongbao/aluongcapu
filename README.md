@@ -12,6 +12,12 @@ Lần đầu, tạo tài khoản chính bằng email và mật khẩu từ 10 k�
 
 ## Tính năng
 
+- Kỷ niệm đã xóa vào **Thùng rác** trên dòng thời gian. Cả hai có thể khôi phục kỷ niệm và ảnh đính kèm còn lưu. Kỷ niệm trong thùng rác được giữ cho tới khi khôi phục.
+- Trang đang mở tự kiểm tra nội dung chung sau vài giây. Việc tải lại dữ liệu nền tạm dừng khi đang mở hộp thoại để giữ nội dung đang nhập.
+
+- Nút **Tìm nội dung** trên thanh điều hướng hỗ trợ từ khóa tiếng Việt có dấu và không dấu. Kết quả gồm kỷ niệm, album, ảnh/video, thư tình và địa điểm.
+- Trong **Cài đặt → Hai người → Đổi mật khẩu**, nhập mật khẩu hiện tại và xác nhận mật khẩu mới. Sau khi lưu, đăng nhập lại trên các thiết bị đang sử dụng tài khoản đó.
+
 Trong mục **Hai người**, dùng **Đặt ngày yêu** để lưu ngày chung và xem bộ đếm ngay giữa hai avatar. Nút **Đổi avatar** hiện dưới hồ sơ của bạn. Nút **Lưu kỷ niệm** cho phép viết và đính kèm ảnh từ thiết bị hoặc album vào dòng thời gian chung.
 
 - **Tin nhắn** gửi văn bản, emoji, ảnh và link HTTP/HTTPS. Có trả lời, thả cảm xúc, sửa, xóa, báo đã đọc, số tin chưa đọc, tải lịch sử và gửi lại.
@@ -79,6 +85,7 @@ Sao lưu máy chủ gồm cơ sở dữ liệu, tài khoản và tệp gốc. C�
 .venv\Scripts\python.exe database_tools.py backup couple-backup.zip
 $env:MONGODB_DB = 'universe_recovery'
 $env:DATA_DIR = 'data/recovery'
+.venv\Scripts\python.exe database_tools.py restore couple-backup.zip --dry-run
 .venv\Scripts\python.exe database_tools.py restore couple-backup.zip
 ```
 

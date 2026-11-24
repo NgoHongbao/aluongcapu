@@ -42,6 +42,9 @@ def test_sqlite_migration_and_restore(tmp_path):
         archive = tmp_path / 'snapshot.zip'
         backup(staged, destination, archive)
         restored = tmp_path / 'restored'
+        assert restore(recovered, archive, restored, dry_run=True)['files'] == 2
+        assert not restored.exists()
+        assert recovered.count('media') == 0
         restore(recovered, archive, restored)
         assert recovered.one('albums', id='album-id')['title'] == 'Album cũ'
         assert (restored / name).read_bytes() == b'original'

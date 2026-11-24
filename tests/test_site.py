@@ -90,3 +90,18 @@ def test_04_delete_and_no_access_after_logout():
     assert client.delete('/api/items/notes/'+note_id,headers={'x-csrf-token':csrf}).status_code==200
     assert client.post('/api/auth/logout',headers={'x-csrf-token':csrf}).status_code==200
     assert client.get('/api/data').status_code==401
+
+
+def test_password_change_revokes_other_sessions():
+    first, second = TestClient(app), TestClient(app)
+    original = {'email': 'aluong@example.test', 'password': 'LongPassphrase123'}
+    assert first.post('/api/auth/login', json=original).status_code == 200
+    assert second.post('/api/auth/login', json=original).status_code == 200
+    session_csrf = first.get('/api/data').json()['csrf']
+    change = {'current_password': original['password'], 'new_password': 'UpdatedPassphrase456'}
+    assert first.post('/api/auth/password', json=change).status_code == 403
+    assert first.post('/api/auth/password', json=change, headers={'x-csrf-token': session_csrf}).status_code == 200
+    assert first.get('/api/data').status_code == 401
+    assert second.get('/api/data').status_code == 401
+    assert second.post('/api/auth/login', json=original).status_code == 401
+    assert second.post('/api/auth/login', json={**original, 'password': change['new_password']}).status_code == 200

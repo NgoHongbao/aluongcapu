@@ -31,9 +31,12 @@ body.dark[data-accent=sky] { --rose: #b2def6; }
 body.dark[data-accent=cream] { --rose: #f1d7aa; }
 @media (max-width: 760px) {
   .chat-fields, .together-grid { grid-template-columns: 1fr; }
+}
+
+@media (max-width: 760px), (max-width: 1100px) and (pointer: coarse) {
   .couple-mobile { position: fixed; bottom: 0; z-index: 30; display: grid; grid-template-columns: repeat(5,1fr); width: 100%; background: var(--paper); box-shadow: var(--shadow); padding-bottom: env(safe-area-inset-bottom); }
   .couple-mobile a, .couple-mobile button { display: grid; place-content: center; padding: 10px 2px; min-height: 50px; text-align: center; color: var(--ink); font: 600 11px var(--font); border: 0; background: none; }
-  body:not(.demo-mode) footer { padding-bottom: 75px; }
+  body:not(.demo-mode) footer { padding-bottom: calc(75px + env(safe-area-inset-bottom)); }
   body:not(.demo-mode) .floating-music { bottom: calc(68px + env(safe-area-inset-bottom)); }
 }
 

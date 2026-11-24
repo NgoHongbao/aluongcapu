@@ -125,9 +125,10 @@ window.createCoupleTools = ({api, $, esc, toast, attachment, getState, getUser, 
     } finally { button.disabled = false; }
   }
 
-  async function avatar(source) {
+  async function avatar(source, role = getUser().role) {
     const photos = getState().media.filter(item => item.mime.startsWith('image/') && (!item.purpose || item.purpose === 'gallery'));
-    modal('Ảnh đại diện', `<form id="avatar-crop" class="form-stack">
+    const displayName = getState().users.find(user=>user.role===role)?.display_name || (role==='partner'?'Pu':'A Lương');
+    modal('Ảnh đại diện của ' + displayName, `<form id="avatar-crop" class="form-stack">
       ${source ? '' : '<label>Tải ảnh<input name="source" type="file" accept="image/jpeg,image/png,image/webp,image/gif"></label>'}
       ${!source && photos.length ? `<label>Hoặc chọn ảnh trong album<select name="album_photo"><option value="">Chọn ảnh</option>${photos.map(item=>`<option value="${esc(item.id)}">${esc(item.caption || item.original_name)}</option>`).join('')}</select></label>` : ''}
       <canvas id="avatar-preview" width="320" height="320" aria-label="Xem trước ảnh đại diện"></canvas>
@@ -169,8 +170,8 @@ window.createCoupleTools = ({api, $, esc, toast, attachment, getState, getUser, 
       button.disabled = true;
       try {
         const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-        const media = await upload(new File([blob],'avatar.png',{type:'image/png'}),'profile');
-        await patchSettings({['avatar_'+getUser().role+'_media_id']:media.id});
+        const media = await upload(new File([blob],'avatar.png',{type:'image/png'}),'avatar');
+        await patchSettings({['avatar_'+role+'_media_id']:media.id});
         closeModal();
         toast('Đã đổi ảnh đại diện ♡');
       } catch (err) { toast(err.message); button.disabled = false; }
@@ -331,7 +332,7 @@ window.createCoupleTools = ({api, $, esc, toast, attachment, getState, getUser, 
         case 'cancel': clearCompose(); break;
         case 'delete': if (confirm('Xóa tin nhắn này?')) await write('/chat/'+id,'DELETE'); break;
         case 'react': await write('/chat/'+id+'/reaction','PUT',{emoji:messages.get(id)['reaction_'+getUser().role]===emoji?'':emoji}); break;
-        case 'avatar': await avatar(id); break;
+        case 'avatar': await avatar(id, button.dataset.ownAvatar); break;
         case 'pin-msg': await pin('message',id); break;
         case 'pin-note': await pin('notes',id); break;
         case 'pin-image': await pin('media',id); break;

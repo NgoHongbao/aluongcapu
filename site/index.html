@@ -8,9 +8,12 @@
   <title>A Lương ♡ CaPu | Our Little Universe</title>
   <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg" />
   <link rel="stylesheet" href="/assets/style.css" />
-  <link rel="stylesheet" href="/assets/couple.css?v=music-volume" />
+  <link rel="stylesheet" href="/assets/couple.css?v=touch" />
+  <link rel="stylesheet" href="/assets/touch.css?v=responsive" />
+  <link rel="stylesheet" href="/assets/garden.css?v=gift-games" />
   <script defer src="/assets/couple.js"></script>
-  <script defer src="/assets/app.js?v=google-login"></script>
+  <script defer src="/assets/garden.js?v=1"></script>
+  <script defer src="/assets/app.js?v=responsive"></script>
 </head>
 <body>
   <div id="star-cursor" aria-hidden="true"></div>
@@ -45,18 +48,20 @@
         <span class="brand-copy"><b>A Lương & CaPu</b><small>our little universe</small></span>
       </a>
       <nav class="nav-links" aria-label="Điều hướng"><a href="#chat" class="server-only">Tin nhắn<span class="chat-count"></span></a>
+        <a href="#us">Hai người</a>
         <a href="#story">Chuyện chúng mình</a>
         <a href="#gallery">Album</a>
         <a href="#letters">Thư tình</a>
         <a href="#secret">Góc bí mật</a>
       </nav>
       <div class="nav-right">
+        <button class="icon-btn" data-action="search" title="Tìm nội dung" aria-label="Tìm nội dung">⌕</button>
         <button class="icon-btn theme-switch" data-action="theme" title="Đổi chế độ sáng tối" aria-label="Đổi chủ đề">☾</button>
         <button class="nav-avatar" data-action="settings" title="Thiết lập website">AL</button>
-        <button class="mobile-menu icon-btn" data-action="menu" aria-label="Mở menu">☰</button>
+        <button class="mobile-menu icon-btn" data-action="menu" aria-label="Mở menu" aria-controls="mobile-nav" aria-expanded="false">☰</button>
       </div>
     </header>
-    <div id="mobile-nav" class="mobile-nav hidden"><a href="#story">Chuyện chúng mình</a><a href="#gallery">Album ảnh</a><a href="#letters">Thư tình</a><a href="#jar">Hũ kỷ niệm</a><a href="#secret">Góc bí mật</a><a href="#calendar">Lịch</a></div>
+    <nav id="mobile-nav" class="mobile-nav hidden" aria-label="Menu chính"><a href="#us">Hai người</a><a href="#garden">Vườn 3D</a><a href="#chat" class="server-only">Tin nhắn</a><a href="#story">Chuyện chúng mình</a><a href="#gallery">Album ảnh</a><a href="#letters">Thư tình</a><a href="#jar">Hũ kỷ niệm</a><a href="#secret">Góc bí mật</a><a href="#calendar">Lịch</a></nav>
     <main>
       <section class="hero" id="home">
         <div class="hero-left">
@@ -85,6 +90,26 @@
       </section>
 
       <section class="marquee" aria-label="Thông điệp yêu thương"><div>YOU & ME <span>✿</span> LITTLE THINGS, BIG FEELINGS <span>♡</span> ONE STORY, TWO HEARTS <span>✦</span> YOU & ME <span>✿</span> LITTLE THINGS, BIG FEELINGS <span>♡</span> ONE STORY, TWO HEARTS <span>✦</span></div></section>
+
+      <section class="section garden-section" id="garden" aria-labelledby="garden-title">
+        <div class="garden-layout">
+          <div class="garden-copy">
+            <h2 class="section-title" id="garden-title">Vườn <em>hai đứa</em></h2>
+            <p class="section-sub">Xoay khu vườn để ngắm cây hoa, hộp quà và lá thư dưới ánh trăng.</p>
+            <div class="head-actions">
+              <button class="btn btn-primary" data-action="new-letter">Viết thư ♡</button>
+              <button class="btn btn-outline" data-action="open-gift">Mở quà</button>
+            </div>
+          </div>
+          <div class="garden-scene">
+            <canvas id="garden-canvas" aria-hidden="true"></canvas>
+            <div class="garden-controls" aria-label="Điều khiển khu vườn">
+              <button type="button" class="icon-btn" data-garden-turn="-1" aria-label="Xoay vườn sang trái">↶</button>
+              <button type="button" class="icon-btn" data-garden-turn="1" aria-label="Xoay vườn sang phải">↷</button>
+            </div>
+          </div>
+        </div>
+      </section>
 
       <section class="section day-section" id="days">
         <div class="day-flower left-flower" aria-hidden="true">✿</div><div class="day-flower right-flower" aria-hidden="true">❀</div>
@@ -124,13 +149,13 @@
       </section>
 
       <section class="section story-section" id="story">
-        <div class="section-head split-head"><div><p class="eyebrow">CHAPTER 01 — OUR STORY</p><h2 class="section-title">Chuyện của <em>chúng mình</em><span class="heading-heart"> ♡</span></h2><p class="section-sub">Những khoảnh khắc bé xíu, nhưng lại là cả một bầu trời thương nhớ.</p></div><button class="btn btn-soft" data-add="memories">+ Thêm một kỷ niệm</button></div>
+        <div class="section-head split-head"><div><p class="eyebrow">CHAPTER 01 — OUR STORY</p><h2 class="section-title">Chuyện của <em>chúng mình</em><span class="heading-heart"> ♡</span></h2><p class="section-sub">Những khoảnh khắc bé xíu, nhưng lại là cả một bầu trời thương nhớ.</p></div><div class="head-actions"><button class="btn btn-outline server-only" data-action="memory-trash">Thùng rác</button><button class="btn btn-soft" data-add="memories">+ Thêm một kỷ niệm</button></div></div>
         <div class="story-layout"><div class="story-intro-card"><span class="story-seal">✦ CHAPTER ONE ✦</span><div class="story-illustration"><div class="story-disc"></div><div class="story-sun"></div><div class="story-fields"></div><span>♡</span></div><button type="button" class="btn btn-soft scene-photo-edit" data-action="hero-photo" data-frame="story_cover_media_id">Đổi ảnh câu chuyện</button><h3>Every love story is beautiful, <em>but ours is my favorite.</em></h3><p>Không cần một câu chuyện hoàn hảo. Chỉ cần có nhau trong từng chương nhỏ.</p><div class="story-sign">with love, A Lương & CaPu</div></div><div class="timeline" id="timeline"></div></div>
       </section>
 
       <section class="section gallery-section" id="gallery"><div class="section-head split-head"><div><p class="eyebrow">CHAPTER 02 — OUR GALLERY</p><h2 class="section-title">Thước phim <em>thương nhớ</em></h2><p class="section-sub">Một chiếc album nhỏ, chứa thật nhiều khoảnh khắc dịu dàng.</p></div><div class="head-actions"><button class="btn btn-soft" data-add="albums">+ Album mới</button><button class="btn btn-primary" data-action="upload">↑ Tải ảnh lên</button></div></div><div class="gallery-controls"><div class="gallery-tabs" id="gallery-tabs"><button class="chip active" data-filter="all">Tất cả ♡</button></div><div class="gallery-count" id="gallery-count">0 khoảnh khắc</div></div><div id="album-cover"></div><div class="gallery-grid" id="gallery-grid"></div><input type="file" id="file-input" accept="image/*,video/mp4,video/webm" multiple hidden/><div class="gallery-foot">Gom từng mảnh ký ức, để mai này vẫn có một nơi trở về. <span>✦</span></div></section>
 
-      <section class="section letters-section" id="letters"><div class="section-head center-head"><p class="eyebrow">CHAPTER 03 — LETTERS FROM THE HEART</p><h2 class="section-title">Có những điều <em>anh muốn nói</em></h2><p class="section-sub">Đôi khi, tình yêu chỉ cần một lá thư được viết bằng tất cả chân thành.</p></div><div class="letter-stage"><div class="letter-accent accent-one">✿</div><div class="letter-accent accent-two">✧</div><div class="letter-envelope" data-action="new-letter" role="button" tabindex="0" aria-label="Viết thư mới"><div class="envelope-back"></div><div class="envelope-front"></div><div class="envelope-fold"></div><div class="envelope-seal">♥</div></div><div class="letter-stage-copy"><span class="handwritten">Dear my love,</span><h3>Một lá thư dành<br/>cho người thương.</h3><p>Lưu lại những lời chưa kịp nói, hoặc hẹn một ngày thật đặc biệt để mở chúng ra.</p><button class="btn btn-primary" data-action="new-letter">Viết lá thư của chúng mình ↗</button></div></div><div class="mini-section-header"><h3>Hộp thư của hai người</h3><span>♡ every word matters</span></div><div id="letter-list" class="letter-list"></div></section>
+      <section class="section letters-section" id="letters"><div class="section-head center-head"><p class="eyebrow">CHAPTER 03 — LETTERS FROM THE HEART</p><h2 class="section-title">Có những điều <em>anh muốn nói</em></h2><p class="section-sub">Đôi khi, tình yêu chỉ cần một lá thư được viết bằng tất cả chân thành.</p></div><div class="letter-stage"><div class="letter-accent accent-one">✿</div><div class="letter-accent accent-two">✧</div><div class="letter-envelope" data-action="new-letter" role="button" tabindex="0" aria-label="Viết thư mới"><div class="envelope-back"></div><div class="envelope-paper" aria-hidden="true">?</div><div class="envelope-front"></div><div class="envelope-fold"></div><div class="envelope-seal">♥</div></div><div class="letter-stage-copy"><span class="handwritten">Dear my love,</span><h3>Một lá thư dành<br/>cho người thương.</h3><p>Lưu lại những lời chưa kịp nói, hoặc hẹn một ngày thật đặc biệt để mở chúng ra.</p><button class="btn btn-primary" data-action="new-letter">Viết lá thư của chúng mình ↗</button></div></div><div class="mini-section-header"><h3>Hộp thư của hai người</h3><span>♡ every word matters</span></div><div id="letter-list" class="letter-list"></div></section>
 
       <section class="section treasures-section" id="jar"><div class="treasure-col jar-area"><p class="eyebrow">CHAPTER 04 — THE MEMORY JAR</p><h2 class="section-title">Hũ <em>hạnh phúc</em> ♡</h2><p class="section-sub">Mỗi mẩu giấy là một lời yêu được cất thật kỹ.</p><div class="jar-scene"><div class="jar-spark jar-spark1">✧</div><div class="jar-spark jar-spark2">✦</div><button class="jar-glass" data-action="random-note" aria-label="Rút một mẩu giấy trong hũ"><div class="jar-lid"></div><div class="jar-neck"></div><div class="jar-body"><span class="paper paper-1"></span><span class="paper paper-2"></span><span class="paper paper-3"></span><span class="paper paper-4"></span><span class="paper paper-5"></span><span class="jar-icon">♡</span></div></button><div class="jar-shadow"></div></div><div class="jar-actions"><button class="btn btn-primary" data-action="random-note">✧ Rút một mẩu giấy</button><button class="btn btn-outline" data-add="notes">+ Viết lời nhắn</button><button class="btn btn-soft" data-action="all-notes">Xem những lời nhắn</button></div><div id="note-count" class="handwritten note-count">0 mẩu yêu thương</div></div><div class="treasure-col bucket-area" id="bucket"><p class="eyebrow">OUR LITTLE BUCKET LIST</p><h2 class="section-title">Cùng nhau <em>làm điều nhỏ xinh</em></h2><p class="section-sub">Những điều chúng mình mong một ngày sẽ thực hiện cùng nhau.</p><div class="bucket-card"><div class="bucket-progress-top"><span>ƯỚC MƠ ĐÔI MÌNH</span><span id="goal-progress-label">0/0 hoàn thành</span></div><div class="progress-track"><div id="goal-progress" class="progress-fill"></div></div><div id="goal-list" class="goal-list"></div><button class="add-line" data-add="goals">+ Thêm một điều muốn làm cùng nhau</button></div></div></section>
 

@@ -157,6 +157,7 @@ if use_gridfs and store.mongo is None:
     raise RuntimeError('MEDIA_STORAGE=gridfs requires MONGODB_URI.')
 private_media = PrivateMedia(MEDIA_DIR, store.mongo if use_gridfs else None)
 EXTRA_COLUMNS = {
+    'memories': {'deleted_at': 'TEXT'},
     'users': {'nickname': "TEXT NOT NULL DEFAULT ''", 'auto_avatar': 'INTEGER NOT NULL DEFAULT 0'},
     'gifts': {'music_youtube': "TEXT NOT NULL DEFAULT ''"},
     'daily_answers': {'media_id': "TEXT NOT NULL DEFAULT ''"},
@@ -378,8 +379,39 @@ def login(body: Credentials, response: Response, request: Request):
     except (VerifyMismatchError, VerificationError):
         with mutex: login_attempts.setdefault(ip, []).append(int(time.time()))
         raise HTTPException(401, 'Email hoặc mật khẩu không đúng.')
-    with mutex: login_attempts.pop(ip, None)
-    return create_session(response, row['id'])
+    with mutex:
+        if not store.one('users', id=row['id'], password_hash=row['password_hash']):
+            raise HTTPException(401, 'Email hoặc mật khẩu không đúng.')
+        login_attempts.pop(ip, None)
+        return create_session(response, row['id'])
+
+
+class PasswordChange(BaseModel):
+    current_password: str
+    new_password: str
+
+
+@app.post('/api/auth/password')
+def change_password(body: PasswordChange, request: Request, response: Response):
+    user = get_user(request)
+    require_csrf(request, user)
+    if not 10 <= len(body.new_password) <= 200:
+        raise HTTPException(422, 'Mật khẩu mới cần từ 10 đến 200 ký tự.')
+    if body.current_password == body.new_password:
+        raise HTTPException(422, 'Hãy chọn mật khẩu khác mật khẩu hiện tại.')
+    if len(body.current_password) > 200:
+        raise HTTPException(400, 'Mật khẩu hiện tại không đúng.')
+    try:
+        ph.verify(user['password_hash'], body.current_password)
+    except (VerifyMismatchError, VerificationError):
+        raise HTTPException(400, 'Mật khẩu hiện tại không đúng.')
+    new_hash = ph.hash(body.new_password)
+    with mutex:
+        get_user(request)
+        store.delete('sessions', user_id=user['id'])
+        store.update('users', {'id': user['id']}, {'password_hash': new_hash})
+    response.delete_cookie('al_capu_session', path='/')
+    return {'ok': True}
 
 
 @app.post('/api/auth/logout')
@@ -561,6 +593,12 @@ def data(request: Request):
     payload = {}
     for table in TABLES:
         rows = store.find(table, sort=(('created_at', -1),))
+        if table == 'memories':
+            payload['memory_trash'] = [
+                {key: row[key] for key in ('id', 'title', 'deleted_at')}
+                for row in rows if row.get('deleted_at')
+            ]
+            rows = [row for row in rows if not row.get('deleted_at')]
         payload[table] = [obj for row in rows if (obj := as_json_locks(table, row, user)) is not None]
     payload['media'] = [public_media(row) for row in store.find('media', sort=(('created_at', -1),)) if media_visible(row, user)]
     payload['users'] = [{k: row.get(k, '') for k in ('id','display_name','role','nickname')}
@@ -606,7 +644,7 @@ def update_item(table: str, item_id: str, request: Request, body: dict = Body(..
         raise HTTPException(422, 'Không có nội dung cần cập nhật.')
     with mutex:
         old = store.one(table, id=item_id)
-        if not old:
+        if not old or (table == 'memories' and old.get('deleted_at')):
             raise HTTPException(404, 'Không tìm thấy dữ liệu.')
         if table in ('letters','gifts','notes') and old['created_by'] != user['id']:
             raise HTTPException(403, 'Chỉ người viết mới được sửa nội dung này.')
@@ -629,9 +667,23 @@ def delete_item(table: str, item_id: str, request: Request):
             raise HTTPException(404, 'Không tìm thấy.')
         if table in ('letters','gifts','notes') and old['created_by'] != user['id']:
             raise HTTPException(403, 'Chỉ người viết mới được xóa.')
+        if table == 'memories':
+            if not old.get('deleted_at'):
+                store.update(table, {'id': item_id}, {'deleted_at': utcnow()})
+            return {'ok': True}
         if table == 'albums':
             store.update('media', {'album_id': item_id}, {'album_id': None})
         store.delete(table, id=item_id)
+    return {'ok': True}
+
+
+@app.post('/api/memories/{item_id}/restore')
+def restore_memory(item_id: str, request: Request):
+    user = get_user(request)
+    require_csrf(request, user)
+    with mutex:
+        if not store.update('memories', {'id': item_id}, {'deleted_at': None}):
+            raise HTTPException(404, 'Không tìm thấy kỷ niệm.')
     return {'ok': True}
 
 
@@ -651,7 +703,7 @@ def update_settings(request: Request, body: dict = Body(...)):
                 raise HTTPException(422, 'Hãy nhập ngày bắt đầu theo dạng năm-tháng-ngày.')
         elif key.endswith('_media_id'):
             val = clean_str(val,32)
-            if key.startswith('avatar_') and key != f"avatar_{user['role']}_media_id":
+            if key == 'avatar_owner_media_id' and user['role'] != 'owner':
                 raise HTTPException(403, 'Bạn chỉ có thể đổi avatar của mình.')
             if val:
                 media = store.one('media', id=val)
@@ -704,7 +756,7 @@ def upload(request: Request, file: UploadFile = File(...), purpose: str = 'galle
     user = get_user(request)
     require_csrf(request, user)
     mime = (file.content_type or '').lower()
-    if purpose not in ('gallery', 'chat', 'profile', 'sealed') or (purpose != 'gallery' and not mime.startswith('image/')):
+    if purpose not in ('gallery', 'chat', 'profile', 'avatar', 'sealed') or (purpose != 'gallery' and not mime.startswith('image/')):
         raise HTTPException(415, 'Mục này chỉ nhận ảnh.')
     if mime not in ACCEPTED:
         raise HTTPException(415, 'Chỉ nhận JPG, PNG, WEBP, GIF, MP4, WEBM, MP3, WAV.')
@@ -858,6 +910,10 @@ def export_all(request: Request):
                                   if (obj := as_json_locks(table, dict(r), user)) is not None]
             elif table == 'media':
                 payload[table] = [r for r in store.find(table) if media_visible(r, user)]
+            elif table == 'memories':
+                rows = store.find(table)
+                payload[table] = [row for row in rows if not row.get('deleted_at')]
+                payload['memory_trash'] = [row for row in rows if row.get('deleted_at')]
             else:
                 payload[table] = store.find(table)
         archive.writestr('ky-niem.json', json.dumps(payload, ensure_ascii=False, indent=2))

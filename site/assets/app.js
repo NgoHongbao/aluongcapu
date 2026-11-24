@@ -35,10 +35,26 @@ async function api(path,opts={}){
   if(opts.body && !(opts.body instanceof FormData))config.headers={'Content-Type':'application/json','X-CSRF-Token':csrf,...opts.headers};
   else if(opts.method && opts.method!=='GET')config.headers={'X-CSRF-Token':csrf,...opts.headers};
   let res;try{res=await fetch('/api'+path,config);}catch{throw Error('Không kết nối được máy chủ. Hãy kiểm tra server đang chạy.');}
-  if(!res.ok){let info;try{info=await res.json();}catch{}throw Error(typeof info?.detail==='string'?info.detail:`Máy chủ trả về lỗi ${res.status}`);}
+  if(!res.ok){let info;try{info=await res.json();}catch{}const error=Error(typeof info?.detail==='string'?info.detail:`Máy chủ trả về lỗi ${res.status}`);error.status=res.status;throw error;}
   return res.headers.get('content-type')?.includes('application/json') ? res.json() : res;
 }
-async function reload(){if(DEMO){saveDemo();renderAll();return;}state=await api('/data');currentUser=state.user;csrf=state.csrf;renderAll();}
+let reloadVersion=0, refreshPending=false;
+const mayRefresh=()=>document.visibilityState==='visible'&&!$('#app').classList.contains('hidden')&&$('#modal-backdrop').classList.contains('hidden');
+async function reload({background=false}={}){
+  if(DEMO){saveDemo();renderAll();return;}
+  const version=background?reloadVersion:++reloadVersion;
+  const snapshot=await api('/data');
+  if(version!==reloadVersion)return;
+  if(background&&(!mayRefresh()||JSON.stringify(snapshot)===JSON.stringify(state)))return;
+  state=snapshot;currentUser=state.user;csrf=state.csrf;renderAll();
+}
+async function refreshShared(){
+  if(refreshPending||!mayRefresh())return;
+  refreshPending=true;
+  try{await reload({background:true});}
+  catch(error){if(error.status===401)location.reload();}
+  finally{refreshPending=false;}
+}
 async function createItem(table,obj){
   if(DEMO){const created={id:uuid(),...obj,created_by:currentUser.id,created_at:now()};state[table].unshift(created);await reload();return created;}
   const r=await api('/items/'+table,{method:'POST',body:JSON.stringify(obj)});await reload();return r;
@@ -48,17 +64,30 @@ async function patchItem(table,id,obj){
   const r=await api('/items/'+table+'/'+id,{method:'PATCH',body:JSON.stringify(obj)});await reload();return r;
 }
 async function deleteItem(table,id){
-  if(!confirm('Bạn chắc chắn muốn xóa nội dung này chứ?'))return;
+  const recoverable=!DEMO&&table==='memories';
+  if(!recoverable&&!confirm('Bạn chắc chắn muốn xóa nội dung này chứ?'))return;
   if(DEMO){state[table]=state[table].filter(x=>x.id!==id);if(table==='albums')state.media.forEach(m=>{if(m.album_id===id)m.album_id=null;});await reload();}
   else{await api('/items/'+table+'/'+id,{method:'DELETE'});await reload();}
-  alertToast('Đã xóa kỷ niệm theo yêu cầu.');
+  alertToast(recoverable?'Đã chuyển kỷ niệm vào Thùng rác.':'Đã xóa nội dung.');
 }
 async function patchSettings(obj){if(DEMO){Object.assign(state.settings,obj);await reload();}else{state.settings=await api('/settings',{method:'PATCH',body:JSON.stringify(obj)});await reload();}}
 function mediaSrc(id,thumb=true){const m=state.media.find(x=>x.id===id);if(!m)return '';if(DEMO)return /^data:(image|audio|video)\//.test(m.data||'')?m.data:'';return '/api/media/'+encodeURIComponent(id)+(thumb?'?thumb=true':'');}
 function isImg(m){return m && String(m.mime).startsWith('image/');}
 function displayDate(s){return datefmt(s);}
 function sectionScroll(id){closeModal();document.getElementById(id)?.scrollIntoView({behavior:matchMedia('(prefers-reduced-motion:reduce)').matches?'instant':'smooth'});}
+function setMobileMenu(open){
+ const button=$('.mobile-menu');
+ $('#mobile-nav').classList.toggle('hidden',!open);
+ button.setAttribute('aria-expanded',String(open));
+ button.setAttribute('aria-label',open?'Đóng menu':'Mở menu');
+}
 function initPetals(){if(matchMedia('(prefers-reduced-motion:reduce)').matches)return;const area=$('#petals');for(let i=0;i<13;i++){const e=el('span',{class:'petal'},i%3===0?'✿':i%3===1?'❀':'✧');e.style.left=(i*17+7)%100+'%';e.style.animationDuration=14+i%7*3+'s';e.style.animationDelay=-i*2.8+'s';e.style.fontSize=8+i%5*3+'px';area.appendChild(e);}}
+
+function showApp(){
+ $('#app').classList.remove('hidden');
+ renderAll();
+ if(location.hash)document.getElementById(location.hash.slice(1))?.scrollIntoView({behavior:'instant'});
+}
 
 function renderAll(){
   if(!state.settings)return;
@@ -134,7 +163,7 @@ function renderCounter(){
   $('#next-anniversary').textContent='♡ Bắt đầu '+label+(next?' · Còn '+Math.ceil((next[0]-Date.now())/86400000)+' ngày đến '+next[1]:'');
 }
 function renderProfiles(){
-  for(const button of $$('[data-own-avatar]'))button.hidden=button.dataset.ownAvatar!==currentUser.role;
+  for(const button of $$('[data-own-avatar]'))button.hidden=currentUser.role!=='owner'&&button.dataset.ownAvatar!==currentUser.role;
   for(const [role,selector,letter] of [['owner','#avatar-owner','A'],['partner','#avatar-partner','C']]){
     const box=$(selector), key='avatar_'+role+'_media_id', src=mediaSrc(state.settings[key]);
     const profile=state.users?.find(user=>user.role===role);
@@ -153,7 +182,7 @@ function attachment(item){
 }
 function renderMemories(){
  const items=[...state.memories].sort((a,b)=>(b.event_date||b.created_at).localeCompare(a.event_date||a.created_at));const box=$('#timeline');
- box.innerHTML=items.length?items.map((m,i)=>`<article class="timeline-entry"><div class="timeline-date">${esc(m.event_date?displayDate(m.event_date):displayDate(m.created_at))} · CHAPTER ${String(i+1).padStart(2,'0')}</div><h3>${esc(m.emoji||'♡')} ${esc(m.title)}</h3>${m.body?`<p>${esc(m.body)}</p>`:''}${m.media_id?`<img class="timeline-media" loading="lazy" src="${mediaSrc(m.media_id)}" alt="Ảnh kỷ niệm" />`:''}${m.location?`<p>⌖ ${esc(m.location)}</p>`:''}<div class="entry-actions"><button data-edit="memories:${m.id}">✎ Chỉnh sửa</button><button data-delete="memories:${m.id}">× Xóa</button></div></article>`).join(''):emptyState('Câu chuyện vẫn đang chờ chương đầu tiên. Hãy cùng viết nên một kỷ niệm đáng nhớ.','Viết kỷ niệm đầu tiên','memories');
+ box.innerHTML=items.length?items.map((m,i)=>`<article class="timeline-entry" id="memory-${esc(m.id)}" tabindex="-1"><div class="timeline-date">${esc(m.event_date?displayDate(m.event_date):displayDate(m.created_at))} · CHAPTER ${String(i+1).padStart(2,'0')}</div><h3>${esc(m.emoji||'♡')} ${esc(m.title)}</h3>${m.body?`<p>${esc(m.body)}</p>`:''}${m.media_id?`<img class="timeline-media" loading="lazy" src="${mediaSrc(m.media_id)}" alt="Ảnh kỷ niệm" />`:''}${m.location?`<p>⌖ ${esc(m.location)}</p>`:''}<div class="entry-actions"><button data-edit="memories:${m.id}">✎ Chỉnh sửa</button><button data-delete="memories:${m.id}">× Xóa</button></div></article>`).join(''):emptyState('Câu chuyện vẫn đang chờ chương đầu tiên. Hãy cùng viết nên một kỷ niệm đáng nhớ.','Viết kỷ niệm đầu tiên','memories');
 }
 function renderGallery(){
   const tabs=$('#gallery-tabs');const albums=state.albums;
@@ -335,11 +364,11 @@ function inputField(table,def,item){const [key,label,type,extra]=def;let value=i
  else content=`<input type="${type}" ${attrs} value="${esc(value)}" ${type==='number'?'step="any"':''} ${type==='date'?'max="2100-12-31"':''} placeholder="${esc(label)}"/>`;
  return `<label class="${type==='checkbox'?'check-label':''}" for="f-${key}">${type==='checkbox'?content+esc(label):esc(label)+content}</label>`;
 }
-function openForm(table,id=''){
+function openForm(table,id='',initial=null){
  const spec=SPECS[table];if(!spec)return;
- const item=id?state[table].find(x=>x.id===id):null;
+ const item=id?state[table].find(x=>x.id===id):initial;
  if(id&&!item){alertToast('Không tìm thấy nội dung.');return;}
- if(item&&['notes','letters','gifts'].includes(table)&&!itsMine(item)){alertToast('Chỉ người viết mới được sửa nội dung này.');return;}
+ if(id&&item&&['notes','letters','gifts'].includes(table)&&!itsMine(item)){alertToast('Chỉ người viết mới được sửa nội dung này.');return;}
  const inputs=spec.fields.map(f=>inputField(table,f,item)).join('');
  const sealed=table==='letters'||table==='gifts';
  const picker=table==='memories'?'':sealed
@@ -392,9 +421,96 @@ function openAllNotes(){
  const rows=state.notes.map(n=>`<div class="place-item" style="margin-bottom:10px"><p style="white-space:pre-wrap;font-size:13px;color:var(--ink)">${esc(n.body)}</p>${attachment(n)}<small style="color:var(--rose)">${esc(n.mood)} · ${datefmt(n.created_at)}</small>${!DEMO?` <button data-couple="pin-note" data-id="${n.id}">Ghim lời nhắn</button>`:''}${itsMine(n)?`<div class="place-actions" style="margin-top:9px"><button data-edit="notes:${n.id}">Sửa lời nhắn</button><button data-delete="notes:${n.id}">Xóa</button></div>`:''}</div>`).join('');
  modal('Những mẩu giấy yêu thương',rows||emptyState('Hũ kỷ niệm của hai người còn trống.','Thêm lời nhắn đầu tiên','notes')+'', 'MEMORY JAR',true);
 }
-function openGift(){const gifts=state.gifts.filter(g=>!g.locked&&(!g.unlock_at||new Date(g.unlock_at)<=new Date()||itsMine(g))).filter(g=>g.recipient_role===currentUser.role||itsMine(g));const g=gifts[0];if(!g){modal('Một điều nhỏ dành cho em',`<div style="text-align:center;padding:15px 5px"><div style="font-size:74px;color:var(--rose)">🎀</div><p class="handwritten" style="font-size:37px">A Lương ♡ CaPu</p><p class="modal-description">“Giữa hàng tỷ người, anh chỉ muốn cùng em viết nên câu chuyện của chúng mình.”</p><p style="font-size:11px;color:var(--muted)">Chưa có món quà bí mật nào được tạo. Hãy viết một lời nhắn dành riêng cho người thương nhé.</p><button class="btn btn-primary" data-add="gifts">Chuẩn bị bất ngờ ♡</button></div>`,'A LITTLE SURPRISE');return;}
+function openGift(){const gifts=state.gifts.filter(g=>!g.locked&&(!g.unlock_at||new Date(g.unlock_at)<=new Date()||itsMine(g))).filter(g=>g.recipient_role===currentUser.role||itsMine(g));const g=gifts[0];if(!g){giftModal('Một điều nhỏ dành cho em',`<div style="text-align:center;padding:15px 5px"><div style="font-size:74px;color:var(--rose)">🎀</div><p class="handwritten" style="font-size:37px">A Lương ♡ CaPu</p><p class="modal-description">“Giữa hàng tỷ người, anh chỉ muốn cùng em viết nên câu chuyện của chúng mình.”</p><p style="font-size:11px;color:var(--muted)">Chưa có món quà bí mật nào được tạo. Hãy viết một lời nhắn dành riêng cho người thương nhé.</p><button class="btn btn-primary" data-add="gifts">Chuẩn bị bất ngờ ♡</button></div>`,'A LITTLE SURPRISE');return;}
  const giftTrack=youtubeId(g.music_youtube);
- modal(g.title,`<div class="letter-paper" style="text-align:center"><div style="font-size:62px;line-height:1.3">🎁</div><h3>For ${esc(person(g.recipient_role))} ♡</h3>${nl(g.message)}${attachment(g)}${giftTrack?`<div class="gift-music"><button type="button" class="btn btn-soft" data-action="gift-music" data-track="${giftTrack}">♫ Phát nhạc của món quà</button> <a href="${youtubeWatch(giftTrack)}" target="_blank" rel="noopener noreferrer">Mở trên YouTube ↗</a><div id="gift-music-embed"></div></div>`:''}<div class="signature">A little surprise, with love ♡</div></div>${itsMine(g)?`<div class="photo-tools"><button class="btn btn-soft" data-edit="gifts:${g.id}">Sửa quà và nhạc</button><button class="btn btn-outline" data-delete="gifts:${g.id}">Xóa món quà</button></div>`:''}`,'SPECIAL DELIVERY');}
+ giftModal(g.title,`<div class="letter-paper" style="text-align:center"><div style="font-size:62px;line-height:1.3">🎁</div><h3>For ${esc(person(g.recipient_role))} ♡</h3>${nl(g.message)}${attachment(g)}${giftTrack?`<div class="gift-music"><button type="button" class="btn btn-soft" data-action="gift-music" data-track="${giftTrack}">♫ Phát nhạc của món quà</button> <a href="${youtubeWatch(giftTrack)}" target="_blank" rel="noopener noreferrer">Mở trên YouTube ↗</a><div id="gift-music-embed"></div></div>`:''}<div class="signature">A little surprise, with love ♡</div></div>${itsMine(g)?`<div class="photo-tools"><button class="btn btn-soft" data-edit="gifts:${g.id}">Sửa quà và nhạc</button><button class="btn btn-outline" data-delete="gifts:${g.id}">Xóa món quà</button></div>`:''}`,'SPECIAL DELIVERY');}
+function giftModal(title,body,eyebrow){
+ const sparks=Array.from({length:12},(_,index)=>`<i style="--angle:${index*30}deg;--size:${5+index%4*3}px"></i>`).join('');
+ modal(title,`<div class="gift-reveal"><div class="gift-sparks" aria-hidden="true">${sparks}</div>${body}
+   <div class="form-actions"><button type="button" class="btn btn-soft" data-action="gift-games">Trò chơi cho hai đứa ♡</button></div>
+ </div>`,eyebrow);
+}
+
+const giftQuestions=[
+ 'Nếu được sống lại một buổi đi chơi của hai đứa, bạn chọn buổi nào?',
+ 'Có thói quen nhỏ nào của người kia khiến bạn bật cười?',
+ 'Nếu tình yêu của hai đứa là một món ăn, nó sẽ là món gì?',
+ 'Kỷ niệm nào của tụi mình bạn muốn kể lại sau mười năm nữa?',
+ 'Có điều gì người kia làm gần đây khiến bạn thấy được quan tâm?',
+ 'Nếu cuối tuần này có trọn một buổi rảnh, bạn muốn hai đứa làm gì?',
+ 'Bài hát nào làm bạn nhớ ngay đến người kia?',
+ 'Hai đứa muốn học một điều mới nào cùng nhau?'
+];
+const giftDates=[
+ 'Đi dạo lúc hoàng hôn và mỗi người chụp ba tấm ảnh',
+ 'Cùng nấu một món chưa từng thử',
+ 'Chọn một quán mới rồi gọi món cho nhau',
+ 'Tạo playlist từ năm bài gợi nhớ về hai đứa',
+ 'Tổ chức một buổi xem phim với đồ ăn tự chuẩn bị',
+ 'Viết cho nhau một lá thư mở vào tháng sau',
+ 'Hẹn nhau ăn sáng và cất điện thoại trong một giờ',
+ 'Đi tìm một cuốn sách để tặng nhau'
+];
+function drawDifferent(items,previous){
+ const choices=items.filter(item=>item!==previous);
+ return choices[Math.floor(Math.random()*choices.length)];
+}
+
+function openGiftGames(){
+ modal('Trò chơi cho hai đứa',`<div class="gift-game-menu">
+   <button type="button" data-action="gift-questions"><span aria-hidden="true">✦</span><b>Bốc thẻ tâm sự</b><small>Thay phiên trả lời cùng một câu hỏi.</small></button>
+   <button type="button" data-action="gift-memory"><span aria-hidden="true">♡</span><b>Lật thẻ tìm cặp</b><small>Tìm đủ sáu cặp trong ít lượt nhất.</small></button>
+   <button type="button" data-action="gift-date"><span aria-hidden="true">✿</span><b>Bốc thăm hẹn hò</b><small>Chọn một ý tưởng và lưu vào kế hoạch chung.</small></button>
+ </div>`);
+}
+function openGiftDraw(isDate){
+ const title=isDate?'Bốc thăm hẹn hò':'Bốc thẻ tâm sự';
+ modal(title,`<div class="gift-draw-card"><p id="gift-draw-result" role="status"></p></div><div class="form-actions">
+   <button type="button" class="btn btn-outline" data-action="gift-games">Các trò chơi</button>
+   <button type="button" class="btn btn-soft" id="gift-draw-next">${isDate?'Bốc ý tưởng khác':'Bốc câu hỏi khác'}</button>
+   ${isDate?'<button type="button" class="btn btn-primary" id="gift-draw-save">Thêm vào kế hoạch</button>':''}
+ </div>`);
+ const result=$('#gift-draw-result');
+ const draw=()=>{result.textContent=drawDifferent(isDate?giftDates:giftQuestions,result.textContent);};
+ $('#gift-draw-next').addEventListener('click',draw);
+ $('#gift-draw-save')?.addEventListener('click',()=>openForm('goals','',{title:result.textContent,category:'Hẹn hò'}));
+ draw();
+}
+function openGiftMemory(){
+ const deck=['🌷','🎁','🌙','✉️','🍓','⭐'].flatMap(symbol=>[symbol,symbol]);
+ for(let i=deck.length-1;i>0;i--){
+   const j=Math.floor(Math.random()*(i+1));
+   [deck[i],deck[j]]=[deck[j],deck[i]];
+ }
+ modal('Lật thẻ tìm cặp',`<p id="gift-memory-status" role="status">0 / 6 cặp · 0 lượt</p>
+   <div class="gift-memory-grid">${deck.map((_,i)=>`<button type="button" aria-label="Lật thẻ ${i+1}"><span aria-hidden="true">♡</span></button>`).join('')}</div>
+   <div class="form-actions"><button type="button" class="btn btn-outline" data-action="gift-games">Các trò chơi</button><button type="button" class="btn btn-soft" data-action="gift-memory">Chơi lại</button></div>`);
+ const grid=$('.gift-memory-grid'), status=$('#gift-memory-status');
+ const cards=[...grid.querySelectorAll('button')];
+ let first=null, pairs=0, turns=0, busy=false;
+ const reveal=(index,visible)=>{
+   const card=cards[index];
+   card.classList.toggle('revealed',visible);
+   card.firstElementChild.textContent=visible?deck[index]:'♡';
+   card.setAttribute('aria-label',visible?`Thẻ ${index+1}: ${deck[index]}`:`Lật thẻ ${index+1}`);
+ };
+ cards.forEach((card,index)=>card.addEventListener('click',()=>{
+   if(busy||card.disabled||index===first)return;
+   reveal(index,true);
+   if(first===null){first=index;return;}
+   turns++;
+   const previous=first;
+   first=null;
+   if(deck[previous]===deck[index]){
+     pairs++;
+     cards[previous].disabled=card.disabled=true;
+   }else{
+     busy=true;
+     setTimeout(()=>{reveal(previous,false);reveal(index,false);busy=false;},680);
+   }
+   status.textContent=pairs===6?`Tìm đủ sáu cặp sau ${turns} lượt! ♡`:`${pairs} / 6 cặp · ${turns} lượt`;
+ }));
+}
 function openPlace(id){const p=state.places.find(x=>x.id===id);if(!p)return;modal(p.name,`<div class="letter-paper"><h3>Our memory map ♡</h3>${nl(p.description||'Một nơi chờ chúng mình viết thêm câu chuyện.')}${attachment(p)}<p style="font-size:12px">${p.visited?'✓ Đã ghé thăm':'✧ Muốn ghé thăm'}${p.event_date?' · '+datefmt(p.event_date):''}</p></div><div class="form-actions" style="margin-top:20px"><a class="btn btn-outline" href="https://www.google.com/maps?q=${encodeURIComponent(p.lat+','+p.lng)}" target="_blank" rel="noopener noreferrer">Mở Google Maps ↗</a><button class="btn btn-soft" data-edit="places:${id}">Sửa</button></div>`,'PLACES & PROMISES');}
 function formSettings(){
  const settings=state.settings;
@@ -410,7 +526,76 @@ function openSettings(tab='general'){currentSettingsTab=tab;modal('Góc chỉnh 
  <label>Tên hiển thị<input name="display_name" value="${esc(currentUser.display_name)}" maxlength="60" required></label>
  <label>Biệt danh<input name="nickname" value="${esc(currentUser.nickname)}" maxlength="60"></label>
  <label><input name="auto_avatar" type="checkbox" ${currentUser.auto_avatar?'checked':''}> Tự dùng ảnh hồ sơ mới làm avatar khi tải lên</label>
- <div class="form-actions"><button type="button" class="btn btn-soft" data-couple="avatar">Tải và cắt ảnh</button><button type="submit" class="btn btn-primary">Lưu hồ sơ</button></div></form>`:''}${!DEMO&&tab==='people'&&state.google_enabled?'<button class="btn btn-outline" type="button" data-action="link-google">Liên kết tài khoản Google</button>':''}${formSettings()}`,'PRIVATE LITTLE CORNER');}
+ <div class="form-actions"><button type="button" class="btn btn-soft" data-couple="avatar">Tải và cắt ảnh</button><button type="submit" class="btn btn-primary">Lưu hồ sơ</button></div></form><div class="settings-actions"><button class="btn btn-outline" type="button" data-action="password">Đổi mật khẩu</button></div>`:''}${!DEMO&&tab==='people'&&state.google_enabled?'<button class="btn btn-outline" type="button" data-action="link-google">Liên kết tài khoản Google</button>':''}${formSettings()}`,'PRIVATE LITTLE CORNER');}
+
+function openPasswordForm(){
+ modal('Đổi mật khẩu', `<form id="password-form" class="form-stack">
+   <label>Mật khẩu hiện tại<input name="current_password" type="password" autocomplete="current-password" maxlength="200" required></label>
+   <label>Mật khẩu mới<input name="new_password" type="password" autocomplete="new-password" minlength="10" maxlength="200" required></label>
+   <label>Nhập lại mật khẩu mới<input name="confirmation" type="password" autocomplete="new-password" minlength="10" maxlength="200" required></label>
+   <p class="modal-description">Bạn sẽ cần đăng nhập lại trên mọi thiết bị sau khi đổi mật khẩu.</p>
+   <p class="modal-description" data-password-error role="alert"></p>
+   <div class="form-actions"><button type="button" class="btn btn-outline" data-settingstab="people">Quay lại</button><button type="submit" class="btn btn-primary">Lưu mật khẩu</button></div>
+ </form>`);
+}
+
+function openMemoryTrash(){
+ const items=state.memory_trash||[];
+ const list=items.map(item=>`<div class="settings-actions"><span>${esc(item.title)} · ${esc(datefmt(item.deleted_at))}</span><button type="button" class="btn btn-outline" data-action="restore-memory" data-id="${esc(item.id)}">Khôi phục</button></div>`).join('');
+ modal('Thùng rác kỷ niệm',list||'<p class="modal-description">Chưa có kỷ niệm nào trong thùng rác.</p>');
+}
+
+function normalizeSearch(value){
+ return String(value ?? '').toLowerCase().normalize('NFD').replace(/\p{M}/gu,'').replaceAll('đ','d');
+}
+
+function openSearch(){
+ modal('Tìm nội dung', `<div class="form-stack">
+   <label>Từ khóa<input id="content-search" type="search" maxlength="150" placeholder="Tên, nội dung hoặc địa điểm"></label>
+   <p id="search-status" class="modal-description" role="status">Tìm kỷ niệm, ảnh, thư tình, lịch, lời nhắn và kế hoạch.</p>
+   <div id="search-results"></div>
+ </div>`);
+ const sources = [
+   [state.memories, 'Kỷ niệm', 'memory', 'title', ['body','location']],
+   [state.albums, 'Album', 'album', 'title', ['description']],
+   [state.media.filter(m=>(!m.purpose||m.purpose==='gallery')&&(isImg(m)||m.mime.startsWith('video/'))), 'Ảnh và video', 'photo', 'original_name', ['caption']],
+   [state.letters.filter(l=>itsMine(l)||(!DEMO?true:l.recipient_role===currentUser.role&&l.status!=='draft')), 'Thư tình', 'letter', 'title', ['body']],
+   [state.places, 'Địa điểm', 'place', 'name', ['description']],
+   [state.notes, 'Lời nhắn', 'note', 'body', ['mood']],
+   [state.goals, 'Kế hoạch', 'goal', 'title', ['category']],
+   [state.events, 'Lịch', 'event', 'title', ['details','location','event_date']]
+ ];
+ const entries = sources.flatMap(([items,label,kind,title,fields])=>items.map(item=>{
+   const visibleFields = (item.locked||(kind==='letter'&&DEMO&&!itsMine(item)&&item.unlock_at&&new Date(item.unlock_at)>new Date())) ? [] : fields;
+   const text = normalizeSearch([item[title], ...visibleFields.map(field=>item[field])].join(' '));
+   return {item,label,kind,title,text};
+ }));
+ $('#content-search').addEventListener('input', event=>{
+   const query = normalizeSearch(event.target.value).trim();
+   const results = query ? entries.filter(entry=>query.split(/\s+/).every(word=>entry.text.includes(word))) : [];
+   $('#search-status').textContent = !query ? 'Nhập từ khóa để tìm nội dung.' : results.length
+     ? `Hiển thị ${Math.min(50,results.length)}/${results.length} kết quả.` : 'Không tìm thấy nội dung phù hợp.';
+   $('#search-results').replaceChildren(...results.slice(0,50).map(({item,label,kind,title})=>{
+     const button = el('button', {class:'btn btn-outline',type:'button'}, `${label} · ${short(kind==='photo'&&item.caption||item[title],80)}`);
+     button.addEventListener('click',()=>{
+       if(kind==='photo')openPhoto(item.id);
+       if(kind==='letter')openLetter(item.id);
+       if(kind==='place')openPlace(item.id);
+       if(kind==='note')modal('Lời nhắn', `<div class="letter-paper">${nl(item.body)}</div>`);
+       if(kind==='goal')modal(item.title, `<p class="modal-description">${esc(item.category||'Cùng nhau')} · ${item.done?'Đã hoàn thành':'Chưa hoàn thành'}</p>${attachment(item)}`);
+       if(kind==='event')modal(item.title, `<p class="modal-description">${esc(datefmt(item.event_date))}${item.location?' · '+esc(item.location):''}</p><p>${nl(item.details)}</p>${attachment(item)}`);
+       if(kind==='album'){activeAlbum=item.id;renderGallery();sectionScroll('gallery');}
+       if(kind==='memory'){
+         closeModal();
+         const entry = document.getElementById('memory-'+item.id);
+         entry?.focus({preventScroll:true});
+         entry?.scrollIntoView({block:'center'});
+       }
+     });
+     return button;
+   }));
+ });
+}
 async function saveUpload(file,purpose='gallery'){
  if(DEMO){
    if(!file.type.startsWith('image/'))throw Error('Bản xem trước chỉ hỗ trợ tải ảnh.');
@@ -454,6 +639,18 @@ async function handleAction(action,btn){
  switch(action){
  case 'close-modal':closeModal();break;
  case 'settings':openSettings();break;
+ case 'search':openSearch();break;
+ case 'memory-trash':if(!DEMO)openMemoryTrash();break;
+ case 'restore-memory':
+   btn.disabled=true;
+   try{
+     await api('/memories/'+encodeURIComponent(btn.dataset.id)+'/restore',{method:'POST'});
+     await reload();
+     if($('#modal-body').contains(btn))openMemoryTrash();
+     alertToast('Đã khôi phục kỷ niệm.');
+   }finally{btn.disabled=false;}
+   break;
+ case 'password':if(!DEMO)openPasswordForm();break;
  case 'link-google':{const start=await api('/auth/google/link',{method:'POST'});location.assign(start.url);break;}
  case 'hero-photo':openHeroPhoto(btn.dataset.frame);break;
  case 'love-date': {
@@ -464,12 +661,16 @@ async function handleAction(action,btn){
    break;
  }
  case 'theme':await patchSettings({theme:state.settings.theme==='light'?'dark':'light'});break;
- case 'menu':$('#mobile-nav').classList.toggle('hidden');break;
+ case 'menu':setMobileMenu($('#mobile-nav').classList.contains('hidden'));break;
  case 'upload':$('#file-input').click();break;
  case 'new-letter':openForm('letters');break;
  case 'random-note':openRandomNote();break;
  case 'all-notes':openAllNotes();break;
  case 'open-gift':openGift();break;
+ case 'gift-games':openGiftGames();break;
+ case 'gift-questions':openGiftDraw(false);break;
+ case 'gift-date':openGiftDraw(true);break;
+ case 'gift-memory':openGiftMemory();break;
  case 'scroll-gallery':sectionScroll('gallery');break;
  case 'scroll-story':sectionScroll('story');break;
  case 'set-cover':await patchSettings({cover_media_id:btn.dataset.id});closeModal();alertToast('Đã thay ảnh bìa của hai người ♡');break;
@@ -520,7 +721,22 @@ async function runClick(e){
  }catch(err){alertToast(err.message||'Có lỗi xảy ra.');}
 }
 async function runSubmit(e){const form=e.target;
- if(form.id==='auth-form'){e.preventDefault();$('#auth-error').classList.add('hidden');const values=Object.fromEntries(new FormData(form));const b=$('#auth-submit');b.disabled=true;b.textContent='Đang mở cánh cửa nhỏ...';try{const url=authMode==='login'?'/auth/login':'/auth/register';await api(url,{method:'POST',body:JSON.stringify(values)});const address=new URL(location.href);if(address.searchParams.has('invite')){address.searchParams.delete('invite');history.replaceState(null,'',address);}const data=await api('/data');state=data;currentUser=data.user;csrf=data.csrf;$('#auth-screen').classList.add('hidden');$('#app').classList.remove('hidden');renderAll();}catch(err){const a=$('#auth-error');a.textContent=err.message;a.classList.remove('hidden');}finally{b.disabled=false;b.textContent=authMode==='login'?'Đăng nhập ↗':'Tạo không gian kỷ niệm ↗';}return;}
+ if(form.id==='password-form'){
+   e.preventDefault();
+   const button=form.querySelector('[type=submit]');
+   if(button.disabled)return;
+   const {current_password,new_password,confirmation}=Object.fromEntries(new FormData(form));
+   const error=form.querySelector('[data-password-error]');
+   if(new_password!==confirmation){error.textContent='Hai mật khẩu mới không khớp.';return;}
+   button.disabled=true;
+   error.textContent='';
+   try{
+     await api('/auth/password',{method:'POST',body:JSON.stringify({current_password,new_password})});
+     location.reload();
+   }catch(err){error.textContent=err.message;button.disabled=false;}
+   return;
+ }
+ if(form.id==='auth-form'){e.preventDefault();$('#auth-error').classList.add('hidden');const values=Object.fromEntries(new FormData(form));const b=$('#auth-submit');b.disabled=true;b.textContent='Đang mở cánh cửa nhỏ...';try{const url=authMode==='login'?'/auth/login':'/auth/register';await api(url,{method:'POST',body:JSON.stringify(values)});const address=new URL(location.href);if(address.searchParams.has('invite')){address.searchParams.delete('invite');history.replaceState(null,'',address);}const data=await api('/data');state=data;currentUser=data.user;csrf=data.csrf;$('#auth-screen').classList.add('hidden');showApp();}catch(err){const a=$('#auth-error');a.textContent=err.message;a.classList.remove('hidden');}finally{b.disabled=false;b.textContent=authMode==='login'?'Đăng nhập ↗':'Tạo không gian kỷ niệm ↗';}return;}
  if(form.id==='music-settings-form'){
    e.preventDefault();
    const button=form.querySelector('[type=submit]');
@@ -619,13 +835,18 @@ async function init(){
  $('#file-input').addEventListener('change',async e=>{await uploadFiles(e.target.files);e.target.value='';});
  document.addEventListener('change',async e=>{if(e.target.id==='music-file-input'){const editingPlaylist=!!$('#music-settings-form');try{await uploadFiles(e.target.files,'music');if(!editingPlaylist)openSettings();}catch(err){alertToast(err.message);}finally{e.target.value='';}}});
  $('#modal-backdrop').addEventListener('click',e=>{if(e.target.id==='modal-backdrop')closeModal();});
- document.addEventListener('keydown',e=>{if(e.key==='Escape')closeModal();if((e.key==='Enter'||e.key===' ')&&e.target.matches('.letter-envelope')){e.preventDefault();openForm('letters');}});
- document.querySelectorAll('#mobile-nav a').forEach(a=>a.addEventListener('click',()=>$('#mobile-nav').classList.add('hidden')));
+ document.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal();if(!$('#mobile-nav').classList.contains('hidden')){setMobileMenu(false);$('.mobile-menu').focus();}}if((e.key==='Enter'||e.key===' ')&&e.target.matches('.letter-envelope')){e.preventDefault();openForm('letters');}});
+ $('#mobile-nav').addEventListener('click',e=>{if(e.target.closest('a'))setMobileMenu(false);});
+ window.addEventListener('resize',()=>{if(!$('.mobile-menu').getClientRects().length)setMobileMenu(false);});
  window.addEventListener('scroll',()=>$('#navbar')?.classList.toggle('shrink',scrollY>40),{passive:true});
- if(DEMO){loadDemo();$('#auth-screen').classList.add('hidden');$('#app').classList.remove('hidden');$('#demo-ribbon').classList.remove('hidden');renderAll();}
- else{try{const status=await api('/auth/status');if(status.logged_in){state=await api('/data');currentUser=state.user;csrf=state.csrf;$('#app').classList.remove('hidden');renderAll();const googleResult=new URLSearchParams(location.search).get('google');if(googleResult){alertToast(googleResult==='linked'?'Đã liên kết tài khoản Google':'Chưa thể liên kết Google. Hãy thử lại.');const url=new URL(location.href);url.searchParams.delete('google');history.replaceState(null,'',url);}}else setupAuth(status);}catch(err){setupAuth({setup_needed:false});$('#auth-error').textContent=err.message;$('#auth-error').classList.remove('hidden');}}
+ if(DEMO){loadDemo();$('#auth-screen').classList.add('hidden');$('#demo-ribbon').classList.remove('hidden');showApp();}
+ else{try{const status=await api('/auth/status');if(status.logged_in){state=await api('/data');currentUser=state.user;csrf=state.csrf;showApp();const googleResult=new URLSearchParams(location.search).get('google');if(googleResult){alertToast(googleResult==='linked'?'Đã liên kết tài khoản Google':'Chưa thể liên kết Google. Hãy thử lại.');const url=new URL(location.href);url.searchParams.delete('google');history.replaceState(null,'',url);}}else setupAuth(status);}catch(err){setupAuth({setup_needed:false});$('#auth-error').textContent=err.message;$('#auth-error').classList.remove('hidden');}}
  clockTimer=setInterval(()=>{if(!$('#app').classList.contains('hidden')&&state.settings?.start_date)renderCounter();},1000);
- if(!DEMO){setInterval(async()=>{if(!$('#app').classList.contains('hidden')&&$('#modal-backdrop').classList.contains('hidden')&&document.visibilityState==='visible'){try{await reload();}catch{/* reconnect on next interval */}}},30000);}
+ if(!DEMO){
+   setInterval(refreshShared,5000);
+   document.addEventListener('visibilitychange',refreshShared);
+   window.addEventListener('online',refreshShared);
+ }
 }
 init();
 })();
